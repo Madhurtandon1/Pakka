@@ -71,6 +71,28 @@ TEMPLATES = {
         "en": "Thank you. Your instalments with {lender} are up to date.",
         "hi": "धन्यवाद। {lender} की आपकी किस्तें अब पूरी हैं।",
     },
+    # "Can't pay today". Pakka explains the lender's own carry-forward; it never decides to skip a payment.
+    "T_SKIP_ACK": {
+        "en": "Okay. Today's amount will be collected from tomorrow's sales, as your lender's plan allows. "
+              "{charges_note} Pay part now if you can: {link}",
+        "hi": "ठीक है। आज की रकम कल की बिक्री से ली जाएगी, जैसा आपके लोन देने वाले का प्लान अनुमति देता है। "
+              "{charges_note} हो सके तो अभी कुछ हिस्सा भर दें: {link}",  # HI: needs native review
+    },
+    "T_SKIP_ROUTED": {
+        "en": "Your request has been sent to {lender}. They will decide and let you know. "
+              "Until then, your current schedule stays the same.",
+        "hi": "आपका अनुरोध {lender} को भेज दिया गया है। फ़ैसला वही करेंगे और आपको बताएँगे। "
+              "तब तक आपका मौजूदा शेड्यूल वैसा ही रहेगा।",  # HI: needs native review
+    },
+    "T_SKIP_CALLBACK": {
+        "en": "Is everything okay? A person from {lender} can help you plan this. Pick a time for a call below.",
+        "hi": "सब ठीक है? {lender} से एक व्यक्ति इसकी योजना बनाने में आपकी मदद कर सकता है। "
+              "नीचे कॉल का समय चुनिए।",  # HI: needs native review
+    },
+    "T_CALLBACK_BOOKED": {
+        "en": "Booked. Someone from {lender} will call you at {time} on {date}. We'll remind you at that time.",
+        "hi": "बुक हो गया। {lender} से कोई आपको {date} को {time} बजे कॉल करेगा। उसी समय हम आपको याद दिलाएँगे।",  # HI: needs native review
+    },
     "T_REPEAT_OFFER": {
         "en": "You can view offers from lenders on the offers screen. Compare them before choosing.",
         "hi": "आप ऑफ़र स्क्रीन पर अलग-अलग लोन देने वालों के ऑफ़र देख सकते हैं। चुनने से पहले तुलना करें।",
@@ -83,8 +105,9 @@ REQUEST_NAMES = {
 }
 
 OPTIONS = {
-    "T_SHORTFALL": ["pay_today", "pay_later", "lower_deduction", "reschedule", "callback", "already_paid"],
-    "T_ARREARS": ["pay_today", "pay_later", "lower_deduction", "reschedule", "callback", "already_paid"],
+    "T_SHORTFALL": ["pay_today", "pay_later", "skip_today", "lower_deduction", "reschedule", "callback", "already_paid"],
+    "T_ARREARS": ["pay_today", "pay_later", "skip_today", "lower_deduction", "reschedule", "callback", "already_paid"],
+    "T_SKIP_ACK": ["pay_today", "callback"],
     "T_DIP_RISK": ["lower_deduction", "callback"],
     "T_PAY_LINK": ["already_paid", "callback"],
     "T_PAY_CHOICE": ["already_paid", "callback"],
@@ -106,6 +129,7 @@ def rupees(paise: int) -> str:
     return f"₹{s}" + (f".{p:02d}" if p else "")
 
 
+# HI: needs native review (month names used in Hindi messages)
 HI_MONTHS = ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"]
 
 

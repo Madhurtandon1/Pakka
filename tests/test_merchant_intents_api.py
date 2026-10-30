@@ -135,5 +135,5 @@ def test_soundbox_speak_rejects_anything_but_the_cue(monkeypatch):
 
 def test_pages_and_unknown_merchant():
     assert client.get("/merchant").status_code == 200
-    assert len(client.get("/merchant/personas").json()["personas"]) == len(desk.book) == 5
+    assert len(client.get("/merchant/personas").json()["personas"]) == len(desk.book) == 6
     assert client.post("/merchant/nope/simulate", params={"day": 1}).status_code == 404

@@ -544,3 +544,54 @@ def test_20_mobile(phone_ui):
         box = ui.p.locator(sel).bounding_box()
         assert box and box["width"] >= 24 and box["height"] >= 24, (sel, box)
     ui.shot("mobile_card")
+
+
+def test_21_fruit_cart_cant_pay_today(ui):
+    """21. Verma Fruit Cart: "Can't pay today" ×3 → carry-forward explained twice, then a callback is booked"""
+    ui.open("fruit_cart", mic="fake")
+    ui.allow()
+    ui.run(5)
+    ui.see("#card", "Today's sales weren't enough")
+    ui.p.click("#card [data-opt=skip_today]")
+    ui.see("#card .reasons", "optional")
+    ui.see("#card .reasons", "Prefer not to say")
+    ui.shot("reason_chips")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#card [data-reason=low_sales]")
+    ui.see("#card", "as your lender's plan allows")
+    ui.see("#card", "Pay via UPI")
+    assert ui.latest("fruit_cart")["action"] == "acknowledge_carry_forward"
+    ui.shot("day5_carry_forward")
+    # day 6: no new message from Pakka (every other day); the owner speaks instead
+    ui.run(6)
+    ui.p.evaluate("window.__transcript='aaj nahi de paunga, kal kaat lena'")
+    ui.p.click("#mic")
+    expect(ui.p.locator("#replyText")).to_have_value("aaj nahi de paunga, kal kaat lena")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#send")
+    ui.see("#card", "as your lender's plan allows")
+    ui.see("#skips", "2 requests")
+    ui.see("#skips", "Stress flag")
+    ui.shot("day6_voice_and_stress_flag")
+    # day 7: third in a row -> a person, with times inside contact hours
+    ui.run(7)
+    ui.p.click("#skipBtn")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#card [data-reason=none]")
+    ui.see("#card", "Is everything okay?")
+    slots = ui.p.locator("#card [data-slot]")
+    assert slots.count() >= 3
+    hours = [int(x[11:13]) for x in ui.p.eval_on_selector_all("#card [data-slot]", "b=>b.map(x=>x.dataset.slot)")]
+    assert all(8 <= h < 19 for h in hours), hours
+    ui.shot("day7_callback_offer")
+    with ui.p.expect_response(lambda r: r.url.endswith("/callbacks")):
+        slots.first.click()
+    ui.see("#toast", "will call you at")
+    ui.see("#card", "Callback booked")
+    ui.see("#skips", "Asked to skip 3 times this month — callback booked")
+    ui.see("#skips", "Booked")
+    ui.see("#reqs", "Call with a person (can't pay today)")
+    with ui.p.expect_response(lambda r: "/offers" in r.url):
+        ui.p.click("#offers")
+    ui.see("#toast", "No loan offers")
+    ui.shot("callback_booked_lender_view")

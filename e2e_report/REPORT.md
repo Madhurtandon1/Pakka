@@ -1,6 +1,6 @@
 # Merchant UI test report
 
-Run: 31 Oct 2026 03:37 · target: local app, offline (no LLM, no Sarvam key) · **27 / 27 scenarios passed**
+Run: 31 Oct 2026 03:55 · target: local app, offline (no LLM, no Sarvam key) · **28 / 28 scenarios passed**
 
 | # | Scenario | Result | Notes |
 |---|---|---|---|
@@ -31,16 +31,17 @@ Run: 31 Oct 2026 03:37 · target: local app, offline (no LLM, no Sarvam key) · 
 | 19b | 19. Mic: browser without speech recognition → clear message | ✅ pass |  |
 | 19c | 19. Mic: permission denied → clear message | ✅ pass |  |
 | 20 | 20. Mobile viewport 390×844: no sideways overflow, buttons usable | ✅ pass |  |
+| 21 | 21. Verma Fruit Cart: "Can't pay today" ×3 → carry-forward explained twice, then a callback is booked | ✅ pass |  |
 
 ## Console errors
 
 - None (apart from the expected ones below).
-- Expected offline: 30 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
+- Expected offline: 34 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
 
 ## Failed network requests
 
 - None unexpected.
-- Expected offline: 30 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
+- Expected offline: 34 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
 
 ## Bugs found and fixed
 
@@ -58,7 +59,7 @@ Run: 31 Oct 2026 03:37 · target: local app, offline (no LLM, no Sarvam key) · 
 - Cadence: the person takes over on the 4th proactive contact (days 15, 17, 19 messaged; day 21 → person). The feature doc and README say "the third attempt goes to a person"; the code hands off after three attempts. The wording should say "after three messages". A worsening overdue stage (SMA-0 → SMA-1) can't be reached in the 30-day demo; it is covered by the unit tests.
 - The audit chip for that handover reads "Third try, so a person takes over" although it is the 4th contact.
 
-## Screenshots (49)
+## Screenshots (54)
 
 Saved in `e2e_report/`:
 
@@ -111,3 +112,8 @@ Saved in `e2e_report/`:
 - 19c_mic_denied_01_denied.png
 - 20_mobile_01_mobile_consent.png
 - 20_mobile_02_mobile_card.png
+- 21_fruit_cart_cant_pay_today_01_reason_chips.png
+- 21_fruit_cart_cant_pay_today_02_day5_carry_forward.png
+- 21_fruit_cart_cant_pay_today_03_day6_voice_and_stress_flag.png
+- 21_fruit_cart_cant_pay_today_04_day7_callback_offer.png
+- 21_fruit_cart_cant_pay_today_05_callback_booked_lender_view.png

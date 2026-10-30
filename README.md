@@ -148,7 +148,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-274 tests. 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
+317 tests (plus 28 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -281,6 +281,20 @@ The blind run exposed four general gaps. There were no financial-distress words 
 | `tailor_stress` | Early warning (R3) on day 14, shortfall on day 15. "Bimar tha, dukaan band thi" means hardship: handoff to a person, episode stopped, offers blocked (G4) |
 | `mobile_dispute` | Demo Bank B holds partial deductions as prepayment, so day 8 shows ₹600 due despite a ₹400 deduction. "Maine already pay kiya" means a handoff. Asking for a lower deduction is outside this lender's scope (G6), so that goes to a person too |
 | `general_late_night` | Shortfall detected at 21:30, deferred to 08:00 (G2) |
+| `fruit_cart` (Verma Fruit Cart) | Slow days 5, 6 and 7. "Can't pay today" each day: the lender's carry-forward is explained twice (stress flag on the 2nd), then a callback with a person is booked and shows in the lender view |
+
+### "Can't pay today"
+
+**Principle:** Pakka explains the lender's carry-forward and applies only the lender's preset limit; it never decides to skip a payment. The intent `request_skip_today` (10th label) needs **both** a skip marker ("skip", "kal se", or "aaj" with a negation or "adjust") and a deduct/take/adjust marker ("kaat lena", "take it", "adjust"). Distress words are checked first, and "negation + money word → hardship" comes after it. The reason chips (Sales were low, Shop was closed, Family function, Bank/UPI problem, Other, Prefer not to say) are optional.
+
+| "Can't pay today" request (rolling 30 days, one per day) | Lender `auto_carry_forward` (Demo NBFC A, limit 2) | Lender `request_only` (Demo Bank B) |
+|---|---|---|
+| 1st | `acknowledge_carry_forward`: "Okay. Today's amount will be collected from tomorrow's sales, as your lender's plan allows. Charges as per your loan agreement." + optional "Pay part now" link | `route_skip_request` → lender decides (`pending_lender_decision`), no promise |
+| 2nd | Same, no reason asked again; **stress flag set** (G4 blocks loan offers for 90 days) | Same; stress flag set |
+| 3rd, or 3 days in a row, or over the lender's limit | `human_callback_booking`: "Is everything okay? A person from {lender} can help you plan this." + call times inside the shop's contact hours (next 3 days); booking creates an appointment and a reminder at that time, inside contact hours; automatic handling stops | Same |
+| Any distress (text, or a reason meaning illness, death or calamity) | Existing hardship handoff (G8), contact stops | Same |
+
+**G10 skip limit:** `acknowledge_carry_forward` is impossible for a request-only lender (→ `route_skip_request`) or past the lender's limit (→ `human_callback_booking`). Lender settings live in `LenderConfig.skip_day_policy`; the ledger maths is unchanged (carry-forward FIFO already collects a short day from later sales). On blind v1, the keyword labels are identical before and after (44/50, 0 distress nudged).
 
 ### Evaluation
 
@@ -294,6 +308,8 @@ The blind run exposed four general gaps. There were no financial-distress words 
 | Hardship / dispute / already-paid replies handed to a person (including 4 from merchants who never consented) | 41 / 41 |
 | Keyword intents on our own 31 labelled replies | 29 / 31 (two short replies with no payment word now go to a person) |
 | Agent latency p50 / p95 (keyword path, no network) | ~1.2 ms / ~3.4 ms |
+
+**"Can't pay today" pass, reported separately** (same run, the 5 original personas + Verma Fruit Cart + 200 random merchants, all consented; skip replies on short days): 319 replies, **0 guard violations** (G10, 3rd request → person, callbacks and reminders inside contact hours, distress → person, no decisions); 56 carry-forwards explained, 56 routed to the lender, 105 callbacks offered (69 booked), 70 distress replies handed to a person; 12/12 skip-reply keyword labels.
 
 These numbers show the rules and guards behave as designed on synthetic data, nothing more. R1 is checked against the same ledger it reads, and the reply samples were written alongside the keyword lists. Real impact needs a pilot with a randomised holdout, measuring day-0 and day-7 cure rate, the SMA-0 → SMA-1 roll rate, Bucket-1 resolution, complaint rate, opt-out rate and promises to pay kept.
 

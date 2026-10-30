@@ -70,12 +70,27 @@ MONEY_WORDS = ["paise", "paisa", "paison", "pese", "cash", "money", "bikri", "sa
                "धंधे", "कमाई", "ग्राहक", "बिक्री"]
 PAY_INTENTS = {"will_pay_today", "will_pay_later"}
 
+# "Can't pay today": a reply is request_skip_today only with BOTH
+#   (1) a skip marker: "skip", "kal se" (from tomorrow), or a today-word together with a negation or "adjust"
+#   (2) a deduct / take / adjust / skip marker (a tomorrow-word alone is not enough).
+# Distress words are checked before this (so "bimar hoon, aaj nahi" stays hardship), and the
+# "negation + money word -> hardship" rule comes after it.
+SKIP_WORDS = ["skip", "chhod do", "chod do", "छोड़ दो"]
+FROM_TOMORROW = ["kal se", "कल से", "from tomorrow"]
+TODAY_WORDS = ["aaj", "today", "आज"]
+ADJUST_WORDS = ["adjust", "एडजस्ट", "carry forward", "aage kar"]
+# The second marker must be about the lender taking or adjusting it ("kaat lena", "take it", "adjust").
+# A tomorrow-word alone isn't enough: "aaj nahi, kal kar dunga" means "I'll pay tomorrow", not a skip request.
+LATER_MARKERS = ["kaat", "kat lena", "kat lo", "katna", "deduct", "take it", "le lena", "le lo", "काट",
+                 "कटौती"] + ADJUST_WORDS + SKIP_WORDS
+
 LABELS = {
     "will_pay_today": "will pay today or right now",
     "will_pay_later": "will pay on a later day (tomorrow, next week)",
     "request_lower_deduction": "asks for a smaller daily deduction",
     "request_reschedule": "asks to change the repayment date or get more time",
     "request_callback": "asks for a phone call or to talk to someone",
+    "request_skip_today": "can't pay today and asks for it to be taken tomorrow or adjusted later (no distress)",
     "dispute": "says the deduction or amount is wrong",
     "hardship": "illness, death or funeral, wedding in the family, flood, fire or other calamity, shop closed",
     "already_paid": "says they have already paid",
@@ -89,7 +104,8 @@ SYSTEM_PROMPT = (
     + "\nExamples: 'kal de dunga' -> will_pay_later; 'I'll pay tomorrow' -> will_pay_later; "
       "'abhi bhar raha hoon' -> will_pay_today; 'paying now' -> will_pay_today; "
       "'bimar tha, dukaan band thi' -> hardship; 'my father is in hospital' -> hardship; "
-      "'paise galat kate' -> dispute; 'you deducted twice' -> dispute. "
+      "'paise galat kate' -> dispute; 'you deducted twice' -> dispute; "
+      "'aaj nahi de paunga, kal kaat lena' -> request_skip_today; 'can't pay today, take it tomorrow' -> request_skip_today. "
       "If any distress is mentioned, choose hardship or dispute over other labels."
 )
 
@@ -117,6 +133,11 @@ def _neg(word: str) -> re.Pattern:
 
 
 _PAY_VERBS = [_prefix(w) for w in PAY_VERBS]
+_SKIP = [_compile(w) for w in SKIP_WORDS]
+_FROM_TOMORROW = [_compile(w) for w in FROM_TOMORROW]
+_TODAY = [_compile(w) for w in TODAY_WORDS]
+_ADJUST = [_prefix(w) for w in ADJUST_WORDS]
+_LATER = [_prefix(w) for w in LATER_MARKERS]
 _NEGATIONS = [_neg(w) for w in NEGATIONS]
 _MONEY = [_prefix(w) for w in MONEY_WORDS]
 
@@ -126,13 +147,24 @@ def _any(patterns: list[re.Pattern], text: str) -> bool:
     return any(p.search(text) for p in patterns)
 
 
+def is_skip_request(text: str) -> bool:
+    """Both a skip marker and a tomorrow/deduct/adjust marker (see SKIP_WORDS above)."""
+    low = text.lower()
+    today = _any(_TODAY, low)
+    skip_marker = (_any(_SKIP, low) or _any(_FROM_TOMORROW, low)
+                   or (today and (_any(_NEGATIONS, low) or _any(_ADJUST, low))))
+    return skip_marker and _any(_LATER, low)
+
+
 def keyword_classify(text: str) -> str:
     low = text.lower()
     matched = [label for label, patterns in _PATTERNS if _any(patterns, low)]
-    for label in ("hardship", "dispute", "already_paid"):          # distress first, always
+    for label in ("hardship", "dispute", "already_paid"):          # a) distress first, always
         if label in matched:
             return label
-    negated = _any(_NEGATIONS, low)
+    if is_skip_request(low):                                        # b) "aaj nahi, kal kaat lena"
+        return "request_skip_today"
+    negated = _any(_NEGATIONS, low)                                 # c) "paise nahi hain" -> hardship
     if negated and _any(_MONEY, low):                               # "paise nahi", "bikri nahi ho rahi"
         return "hardship"
     for label in ("request_lower_deduction", "request_reschedule", "request_callback"):

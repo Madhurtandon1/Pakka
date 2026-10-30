@@ -32,6 +32,7 @@ class GuardContext:
     episode_stopped: bool = False
     last_contact_day: Optional[date] = None     # last shortfall nudge delivered in this episode
     sma_worse: bool = False                     # SMA bucket has worsened since that nudge
+    skip_requests_30d: int = 0                  # "can't pay today" requests in the window, including this one
 
 
 @dataclass
@@ -96,6 +97,19 @@ def guard(action: str, ctx: GuardContext) -> Verdict:
         v.action = "no_action"
         v.blocks.append("G8_stopped")
         return v
+
+    # G10: Pakka may confirm the lender's carry-forward only for an auto-carry-forward lender and only within
+    # the lender's own preset limit. Otherwise the request goes to the lender, or past the limit, to a person.
+    if v.action == "acknowledge_carry_forward":
+        cfg = ctx.lender.skip_day_policy
+        if cfg.mode != "auto_carry_forward":
+            v.action = "route_skip_request"
+            v.blocks.append("G10_skip_limit: lender decides every request")
+        elif ctx.skip_requests_30d > cfg.max_auto_per_30_days:
+            v.action, v.escalated, v.stop_episode = "human_callback_booking", True, True
+            v.blocks.append(f"G10_skip_limit: over the lender's limit of {cfg.max_auto_per_30_days}")
+    if v.action == "human_callback_booking":
+        v.escalated, v.stop_episode = True, True     # automatic handling stops; a person helps plan
 
     # G3 cadence: during a shortfall, nudge every other day at most, unless the SMA bucket worsened.
     if (ctx.proactive and ctx.blocker == "edi_shortfall" and ctx.last_contact_day and not ctx.sma_worse

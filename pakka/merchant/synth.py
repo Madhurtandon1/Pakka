@@ -3,7 +3,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from .models import LenderConfig, Loan, Merchant, SettlementDay
+from .models import LenderConfig, Loan, Merchant, SettlementDay, SkipDayPolicy
 
 START = date(2026, 10, 1)
 DAYS = 30
@@ -12,7 +12,8 @@ PRINCIPAL = 1_00_000_00       # ₹1,00,000, in paise
 
 ALL_LENDER_ACTIONS = ["notify_shortfall", "send_pay_link", "schedule_reminder",
                       "route_lower_deduction_request", "route_reschedule_request",
-                      "schedule_callback", "human_handoff", "show_repeat_offer", "no_action"]
+                      "schedule_callback", "human_handoff", "show_repeat_offer", "no_action",
+                      "acknowledge_carry_forward", "route_skip_request", "human_callback_booking"]
 
 LENDERS = {
     "demo_nbfc_a": LenderConfig(
@@ -20,6 +21,7 @@ LENDERS = {
         grievance_officer="R. Mehta, grievance@demo-nbfc-a.example, 1800-000-0001",
         shortfall_mode="carry_forward_fifo", allowed_actions=ALL_LENDER_ACTIONS,
         vpa="collections@demo-nbfc-a",
+        skip_day_policy=SkipDayPolicy(mode="auto_carry_forward", max_auto_per_30_days=2),
     ),
     "demo_bank_b": LenderConfig(
         lender_id="demo_bank_b", lender_name="Demo Bank B",
@@ -27,6 +29,7 @@ LENDERS = {
         shortfall_mode="retain_as_prepayment",
         allowed_actions=[a for a in ALL_LENDER_ACTIONS if a != "route_lower_deduction_request"],
         lower_deduction_requests_enabled=False, vpa="loans@demo-bank-b",
+        skip_day_policy=SkipDayPolicy(mode="request_only"),
     ),
 }
 
@@ -77,6 +80,9 @@ def personas() -> dict[str, Persona]:
     late = _base(rng, 100_000, 160_000)
     late[5], late[6] = 30_000, 70_000                               # short day 6, partial catch-up day 7
 
+    fruit = _base(random.Random(57), 140_000, 220_000)              # own seed: the five above stay unchanged
+    fruit[4], fruit[5], fruit[6] = 30_000, 20_000, 25_000           # slow days 5, 6 and 7
+
     out = [
         _make("kirana_steady", "Sharma Kirana Store", "en", "demo_nbfc_a", kirana,
               "Steady kirana", "Sales always cover the daily payment, so Pakka should never message them."),
@@ -90,6 +96,10 @@ def personas() -> dict[str, Persona]:
         _make("general_late_night", "Gupta General Store", "en", "demo_nbfc_a", late,
               "General store, late at night",
               "Day 6 falls short late at night (9:30 pm). Pakka must wait until 8 am."),
+        _make("fruit_cart", "Verma Fruit Cart", "hi", "demo_nbfc_a", fruit,
+              "Fruit cart, can't pay today",
+              "Sales dip on days 5, 6 and 7. Each day the owner says they can't pay today. Pakka explains the "
+              "lender's carry-forward twice, then offers a call with a person."),
     ]
     return {p.merchant.merchant_id: p for p in out}
 

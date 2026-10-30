@@ -6,16 +6,32 @@ from pydantic import BaseModel
 Lang = Literal["en", "hi"]
 
 Intent = Literal["will_pay_today", "will_pay_later", "request_lower_deduction",
-                 "request_reschedule", "request_callback", "dispute", "hardship",
+                 "request_reschedule", "request_callback", "request_skip_today", "dispute", "hardship",
                  "already_paid", "unclear"]
 
 MerchantAction = Literal["notify_shortfall", "send_pay_link", "schedule_reminder",
                          "route_lower_deduction_request", "route_reschedule_request",
-                         "schedule_callback", "human_handoff", "show_repeat_offer", "no_action"]
+                         "schedule_callback", "human_handoff", "show_repeat_offer", "no_action",
+                         # "Can't pay today": Pakka explains the lender's carry-forward or routes the request;
+                         # it never decides to skip or move a payment.
+                         "acknowledge_carry_forward", "route_skip_request", "human_callback_booking"]
 
 ALL_ACTIONS = set(MerchantAction.__args__)
 ALL_INTENTS = set(Intent.__args__)
 DISTRESS = {"dispute", "hardship", "already_paid"}
+
+
+class SkipDayPolicy(BaseModel):
+    """What the LENDER has pre-set for "can't pay today". Pakka applies this; it never sets it.
+
+    auto_carry_forward: the lender's ledger already collects a short day from later sales
+    (carry_forward_fifo), and Pakka may confirm that up to max_auto_per_30_days times.
+    request_only: every request goes to the lender, who decides.
+    """
+    mode: Literal["auto_carry_forward", "request_only"] = "request_only"
+    max_auto_per_30_days: int = 0
+    charges_note_en: str = "Charges as per your loan agreement."
+    charges_note_hi: str = "शुल्क आपके लोन समझौते के अनुसार।"  # HI: needs native review
 
 
 class LenderConfig(BaseModel):
@@ -31,6 +47,7 @@ class LenderConfig(BaseModel):
         "hi": "शुल्क आपके लोन के Key Fact Statement के अनुसार",
     }
     vpa: str = "lender@demo"
+    skip_day_policy: SkipDayPolicy = SkipDayPolicy()
 
 
 class Merchant(BaseModel):
@@ -113,4 +130,6 @@ class MerchantRescue(BaseModel):
     soundbox_cue_text: Optional[str] = None
     lender_request_id: Optional[str] = None
     scheduled_for: Optional[datetime] = None
+    callback_slots: list[datetime] = []        # offered with human_callback_booking, inside contact hours
+    skip_requests_30d: int = 0                 # including this one, for "can't pay today"
     latency_ms: float = 0.0

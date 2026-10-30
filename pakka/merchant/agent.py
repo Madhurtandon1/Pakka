@@ -26,7 +26,10 @@ from .synth import Persona, personas
 from .templates import OPTIONS, REQUEST_NAMES, SOUNDBOX_CUE, fmt_date, render_both, rupees
 
 SMA_ORDER = {"standard": 0, "SMA-0": 1, "SMA-1": 2, "SMA-2": 3, "NPA": 4}
-ROUTED = {"route_lower_deduction_request", "route_reschedule_request", "human_handoff"}
+ROUTED = {"route_lower_deduction_request", "route_reschedule_request", "human_handoff",
+          "route_skip_request", "human_callback_booking"}
+# Optional reasons for "can't pay today". Any that mean illness, a death or a calamity go to a person (G8).
+DISTRESS_REASONS = {"illness", "death", "calamity", "emergency"}
 
 
 @dataclass
@@ -38,6 +41,7 @@ class Facts:
     store: MerchantStore
     consent: Optional[ConsentRecord] = None
     text: str = ""
+    reason: Optional[str] = None
     episode: Optional[dict] = None
 
     @property
@@ -65,6 +69,8 @@ class State(TypedDict, total=False):
     channel: str
     g5_blocks: list[str]
     rescue: MerchantRescue
+    skip_requests_30d: int
+    skip_consecutive: int
 
 
 def _entry(s: State) -> str:
@@ -91,6 +97,8 @@ def _after_detect(s: State) -> str:
 def _classify(s: State) -> State:
     f = s["f"]
     intent, source = intents.classify(f.text)
+    if f.reason in DISTRESS_REASONS:          # a reason chip about illness, a death or a calamity
+        intent, source = "hardship", "keywords"
     f.episode = f.store.open_episode(f.mid)
     return {"blocker": "edi_shortfall" if f.episode else "reply", "intent": intent, "intent_source": source,
             "reasons": [f"reply classified as {intent} ({source})"], "rule_ids": []}
@@ -111,7 +119,22 @@ def _decide(s: State) -> State:
         action = "show_repeat_offer"
     else:
         action = policy.intent_actions(s["intent"])[0]
-    return {"action": action}
+    if s.get("intent") == "request_skip_today":
+        n, streak = _skip_counts(f)
+        return {"action": policy.skip_action(f.persona.lender, n, streak),
+                "skip_requests_30d": n, "skip_consecutive": streak}
+    return {"action": action, "skip_requests_30d": 0, "skip_consecutive": 0}
+
+
+def _skip_counts(f: Facts) -> tuple[int, int]:
+    """Requests in the rolling window and days in a row, both including today (one per day)."""
+    today = f.now.date()
+    days = set(f.store.skip_days(f.mid, f.persona.loan.loan_id,
+                                 today - timedelta(days=policy.skip_rules()["window_days"] - 1), today)) | {today}
+    streak = 0
+    while today - timedelta(days=streak) in days:
+        streak += 1
+    return len(days), streak
 
 
 def _guard(s: State) -> State:
@@ -129,7 +152,8 @@ def _guard(s: State) -> State:
         total_overdue_paise=f.today.total_overdue_paise,
         last_stress=max(stress, default=None),
         episode_stopped=bool(ep and ep["stopped"]),
-        last_contact_day=last_contact, sma_worse=SMA_ORDER[f.today.sma_bucket] > SMA_ORDER[sma_then])
+        last_contact_day=last_contact, sma_worse=SMA_ORDER[f.today.sma_bucket] > SMA_ORDER[sma_then],
+        skip_requests_30d=s.get("skip_requests_30d", 0))
     v = guard(s["action"], ctx)
     return {"verdict": v, "action": v.action}
 
@@ -149,6 +173,8 @@ def _render(s: State) -> State:
         "send_pay_link": "T_PAY_LINK", "schedule_reminder": "T_REMINDER_SET",
         "route_lower_deduction_request": "T_REQ_ROUTED", "route_reschedule_request": "T_REQ_ROUTED",
         "schedule_callback": "T_CALLBACK", "human_handoff": "T_HANDOFF", "show_repeat_offer": "T_REPEAT_OFFER",
+        "acknowledge_carry_forward": "T_SKIP_ACK", "route_skip_request": "T_SKIP_ROUTED",
+        "human_callback_booking": "T_SKIP_CALLBACK",
     }.get(action)
     if action == "notify_shortfall":
         if blocker == "sales_dip_risk":
@@ -181,7 +207,10 @@ def _render(s: State) -> State:
             "short_amount": rupees(today.shortfall_today_paise), "short_link": upi(today.shortfall_today_paise), "time": f"{when:%H:%M}", "date": fmt_date(when, lang),
             "request": REQUEST_NAMES.get(action, {}).get(lang, ""), "officer": lender.grievance_officer,
             "window": days, "avg": rupees(avg), "edi": rupees(p.loan.edi_paise),
+            "charges_note": getattr(lender.skip_day_policy, f"charges_note_{lang}"),
         }
+        if action == "acknowledge_carry_forward":      # "pay part now": today's gap, or the EDI if none yet
+            by_lang[lang]["link"] = upi(today.shortfall_today_paise or p.loan.edi_paise)
     en, hi = render_both(tid, by_lang)
     cue = SOUNDBOX_CUE[p.merchant.language] if v.channel == "soundbox_cue" else None
     return {"template_id": tid, "message_en": en, "message_hi": hi, "cue": cue}
@@ -209,6 +238,12 @@ def _audit(s: State) -> State:
     if ep and s["blocker"] == "cured":
         f.store.close_episode(ep["episode_id"], f.today.day)
 
+    # Stress flag on the 2nd "can't pay today" in the window: no loan offers for 90 days (G4).
+    if delivered and s.get("intent") == "request_skip_today" \
+            and s.get("skip_requests_30d") == policy.skip_rules()["stress_flag_at_request"]:
+        f.store.add_flag(f.mid, "stress", f.now, "2nd can't-pay-today request in 30 days")
+    slots = callback_slots(f) if delivered and v.action == "human_callback_booking" else []
+
     lang = p.merchant.language
     message = s["message_hi"] if lang == "hi" else s["message_en"]
     consent = f.consent if f.consent and f.consent.active else None
@@ -232,8 +267,20 @@ def _audit(s: State) -> State:
         guard_blocks=blocks, channel=channel, template_id=s.get("template_id"),
         message_en=s["message_en"], message_hi=s["message_hi"],
         options=OPTIONS.get(s.get("template_id"), []) if delivered else [],
-        soundbox_cue_text=s.get("cue"), lender_request_id=request_id, scheduled_for=v.scheduled_for)
+        soundbox_cue_text=s.get("cue"), lender_request_id=request_id, scheduled_for=v.scheduled_for,
+        callback_slots=slots, skip_requests_30d=s.get("skip_requests_30d", 0))
     return {"rescue": rescue}
+
+
+def callback_slots(f: Facts, per_day: int = 3) -> list[datetime]:
+    """Callback times inside the merchant's own contact hours, over the next few days."""
+    lo, hi = effective_window(f.persona.merchant, f.consent)
+    hours = sorted({lo, (lo + hi) // 2, hi - 1})[:per_day]
+    out = []
+    for d in range(policy.skip_rules()["callback_days_ahead"] + 1):
+        day = (f.now + timedelta(days=d)).date()
+        out += [datetime.combine(day, dtime(h)) for h in hours if datetime.combine(day, dtime(h)) > f.now + timedelta(hours=1)]
+    return out[:6]
 
 
 def build():
@@ -281,11 +328,12 @@ class Desk:
         full = self._ledgers[merchant_id]
         return full if day is None else full[:max(1, min(day, len(full)))]
 
-    def _run(self, mode: str, merchant_id: str, day: int, now: datetime, text: str = "") -> MerchantRescue:
+    def _run(self, mode: str, merchant_id: str, day: int, now: datetime, text: str = "",
+             reason: str | None = None) -> MerchantRescue:
         start = time.perf_counter()
         p = self.persona(merchant_id)
         facts = Facts(mode=mode, persona=p, ledger=self.ledger(merchant_id, day), now=now, store=self.store,
-                      consent=self.store.consent(merchant_id), text=text)
+                      consent=self.store.consent(merchant_id), text=text, reason=reason)
         out = GRAPH.invoke({"f": facts})
         rescue = out.get("rescue") or MerchantRescue(
             merchant_id=merchant_id, loan_id=p.loan.loan_id, reasons=["no rule fired"])
@@ -297,9 +345,31 @@ class Desk:
         return self._run("day_end", merchant_id, day, now or self.at(merchant_id, day))
 
     def run_reply(self, merchant_id: str, text: str, now: datetime | None = None,
-                  day: int | None = None) -> MerchantRescue:
+                  day: int | None = None, reason: str | None = None) -> MerchantRescue:
         day = day or self.store.sim_day(merchant_id)
-        return self._run("reply", merchant_id, day, now or self.at(merchant_id, day, "18:05"), text)
+        return self._run("reply", merchant_id, day, now or self.at(merchant_id, day, "18:05"), text, reason)
+
+    def book_callback(self, merchant_id: str, slot: datetime, now: datetime | None = None) -> dict:
+        """Book a callback with a person at the lender, only inside the merchant's contact hours."""
+        p = self.persona(merchant_id)
+        now = now or self.at(merchant_id, self.store.sim_day(merchant_id), "18:10")
+        window = effective_window(p.merchant, self.store.consent(merchant_id))
+        if not in_window(slot, window):
+            raise ValueError(f"slot {slot:%H:%M} is outside the merchant's contact hours")
+        if not now < slot <= now + timedelta(days=policy.skip_rules()["callback_days_ahead"] + 1):
+            raise ValueError("slot must be in the next few days")
+        appt = self.store.add_appointment(merchant_id, p.loan.loan_id, p.lender.lender_id, slot,
+                                          reminder_at=slot, at=now, reason="can't pay today, repeatedly")
+        vals = {lang: {"lender": p.lender.lender_name, "time": f"{slot:%H:%M}", "date": fmt_date(slot, lang)}
+                for lang in ("en", "hi")}
+        en, hi = render_both("T_CALLBACK_BOOKED", vals)
+        self.store.log({"ts": now.isoformat(), "merchant_id": merchant_id, "loan_id": p.loan.loan_id,
+                        "blocker": "reply", "rule_ids": [], "intent": None, "intent_source": "none",
+                        "action": "schedule_callback", "template_id": "T_CALLBACK_BOOKED", "channel": "app_card",
+                        "guard_blocks": [], "policy_ok": 1, "escalated": 1, "language": p.merchant.language,
+                        "proactive": 0, "message": hi if p.merchant.language == "hi" else en,
+                        "scheduled_for": slot.isoformat()})
+        return {**appt, "message_en": en, "message_hi": hi}
 
     def check_offer(self, merchant_id: str, now: datetime | None = None, day: int | None = None) -> MerchantRescue:
         day = day or self.store.sim_day(merchant_id)

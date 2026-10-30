@@ -58,5 +58,24 @@
     "p50_ms": 1.41,
     "p95_ms": 3.99,
     "note": "keyword path, no network"
+  },
+  "skip_requests": {
+    "merchants": 206,
+    "skip_replies": 319,
+    "guard_violations": 0,
+    "violations": [],
+    "actions": {
+      "human_handoff": 70,
+      "acknowledge_carry_forward": 56,
+      "human_callback_booking": 105,
+      "route_skip_request": 56,
+      "schedule_callback": 32
+    },
+    "callbacks_booked": 69,
+    "keywords": {
+      "samples": 12,
+      "correct": 12
+    },
+    "note": "separate pass; not part of the headline numbers above"
   }
 }

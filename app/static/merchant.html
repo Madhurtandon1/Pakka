@@ -81,6 +81,12 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .reply button.mic{background:#fff;color:var(--navy);border:1px solid var(--line)}
 .reply button.mic.on{background:var(--red);color:#fff}
 .micnote{font-size:11px;color:var(--muted);margin-top:-4px}
+.reasons{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.reasons small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.reasons button,.slots button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:999px;padding:5px 10px;font-size:12.5px;margin:0 6px 6px 0;cursor:pointer}
+.slots{margin-top:10px}.slots small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.skipline{font-size:12px;color:var(--muted)}.skipline button{border:0;background:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
+.skipflag{display:inline-block;background:#FFF4E5;color:#9A5B00;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin:4px 0}
 .cvhelp{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .cvhelp small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
 .cvout{font-size:13px;margin-top:8px;background:var(--paper,#f4f7fb);border-radius:10px;padding:8px 10px}
@@ -196,6 +202,7 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
           <div id="card" class="card quiet"></div>
           <div class="reply"><input type="text" id="replyText"><button class="mic" id="mic" title="Speak">🎤</button><button id="send">➤</button></div>
           <div class="micnote" id="micNote">Voice works in Chrome or Edge. Your browser converts speech to text.</div>
+          <div class="skipline"><button id="skipBtn"></button></div>
           <div class="under"><button id="offers"></button><a id="withdraw"></a></div>
           <div class="hours" id="hours"></div>
           <div class="hist" id="hist"></div>
@@ -229,6 +236,7 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
       <div class="panel" id="reqPanel"><p class="h">Sent to the lender to decide</p><div id="reqs"></div></div>
       <div class="panel" id="auditPanel"><p class="h">Everything Pakka did · this shop</p><div class="tbl" id="auditTbl"></div></div>
     </div>
+    <div class="panel" id="skipPanel"><p class="h">"Can't pay today" · this shop, last 30 days</p><div id="skips"></div></div>
   </section>
 </main>
 
@@ -251,6 +259,8 @@ const PLAIN={
   notify_shortfall:"Sent a gentle warning",send_pay_link:"Sent a pay link",schedule_reminder:"Set a reminder",
   route_lower_deduction_request:"Asked the lender for a smaller payment",route_reschedule_request:"Asked the lender for a new date",
   schedule_callback:"Booked a call",human_handoff:"Passed to a person",show_repeat_offer:"Showed loan offers",no_action:"No message",
+  request_skip_today:"can't pay today",acknowledge_carry_forward:"Explained the lender's carry-forward",
+  route_skip_request:"Sent the request to the lender",human_callback_booking:"Offered a call with a person",
 };
 const GUARD={
   G1_consent:"No permission to message",G1_skipped:"Hard time: sent to a person even without permission",
@@ -259,10 +269,11 @@ const GUARD={
   G5_soundbox_safe:"Soundbox kept neutral",G6_lender_scope:"Lender doesn't allow this online, so a person will help",
   G7_attempts:"Third try, so a person takes over",G8_distress:"Hard time or dispute, so a person takes over",
   G8_stopped:"Reminders stopped, a person is handling it",
+  G10_skip_limit:"Past the lender's limit, so a person helps plan",
 };
 const CH={app_card:"App",soundbox_cue:"Soundbox + app",none:"Not sent"};
 const STATUS={standard:"On time","SMA-0":"1–30 days late","SMA-1":"31–60 days late","SMA-2":"61–90 days late",NPA:"Over 90 days late"};
-const REQ={human_handoff:"Talk to a person",route_lower_deduction_request:"Smaller daily payment",route_reschedule_request:"New payment date"};
+const REQ={route_skip_request:"Can't pay today",human_callback_booking:"Call with a person (can't pay today)",human_handoff:"Talk to a person",route_lower_deduction_request:"Smaller daily payment",route_reschedule_request:"New payment date"};
 const REQSTATUS={pending_lender_decision:"Waiting for the lender's decision",pending_lender_contact:"The lender will contact them"};
 const plain=k=>tech?k:(PLAIN[k]||k);
 const guardText=b=>tech?b:(GUARD[b.split(/[ :]/)[0]]||b);
@@ -284,8 +295,12 @@ const T={
       micErr:"Couldn't hear that. Try again, or type your reply.",micCheck:"Check the words, edit if needed, then tap ➤ to send.",
       helpQ:"Need help? You can still write to us. This doesn't turn on alerts.",
       helpNoted:"Noted. Alerts are off, so Pakka won't follow up on payments. Turn on alerts above if you'd like help.",
-      opt:{pay_today:"Pay now",pay_later:"Pay tomorrow",lower_deduction:"Lower deduction",reschedule:"New date",callback:"Call me",already_paid:"I already paid"},
-      say:{pay_today:"I'll pay now",pay_later:"I'll pay tomorrow",lower_deduction:"Please reduce the daily deduction",reschedule:"Please reschedule my payment date",callback:"Please call me",already_paid:"I already paid"}},
+      opt:{pay_today:"Pay now",pay_later:"Pay tomorrow",skip_today:"Can't pay today",lower_deduction:"Lower deduction",reschedule:"New date",callback:"Call me",already_paid:"I already paid"},
+      say:{pay_today:"I'll pay now",pay_later:"I'll pay tomorrow",skip_today:"Can't pay today, please take it from tomorrow's sales",lower_deduction:"Please reduce the daily deduction",reschedule:"Please reschedule my payment date",callback:"Please call me",already_paid:"I already paid"},
+      skipQ:"Can't pay today?",why:"Want to tell us why? (optional)",
+      reasons:{low_sales:"Sales were low",shop_closed:"Shop was closed",family_function:"Family function",bank_problem:"Bank/UPI problem",other:"Other",none:"Prefer not to say"},
+      other:"Can't pay today, please take it from tomorrow's sales. Reason: ",
+      pick:"Pick a time for a call (inside your contact hours):",booked:"Callback booked"},
   hi:{allow:"अनुमति दें",notnow:"अभी नहीं",withdraw:"सहमति वापस लें",offers:"लोन ऑफ़र देखें",offersNo:"ऑफ़र अभी उपलब्ध नहीं",
       placeholder:"हिंदी, English या Hinglish में जवाब दें",quiet:"Pakka से कोई संदेश नहीं। आपकी किस्तें ठीक चल रही हैं।",
       deferred:"Pakka के पास संदेश है, पर वह इंतज़ार करेगा:",title:"आपके लोन के लिए पहले से चेतावनी",
@@ -301,8 +316,12 @@ const T={
       micErr:"आवाज़ सुनाई नहीं दी। फिर से कोशिश करें, या जवाब टाइप करें।",micCheck:"शब्द जाँच लें, ज़रूरत हो तो बदलें, फिर ➤ दबाकर भेजें।",  // HI: needs native review
       helpQ:"मदद चाहिए? आप फिर भी हमें लिख सकते हैं। इससे अलर्ट चालू नहीं होंगे।",  // HI: needs native review
       helpNoted:"ध्यान दिया। अलर्ट बंद हैं, इसलिए Pakka भुगतान के बारे में आगे संपर्क नहीं करेगा। मदद चाहिए तो ऊपर अलर्ट चालू करें।",  // HI: needs native review
-      opt:{pay_today:"अभी भरूँगा",pay_later:"कल भरूँगा",lower_deduction:"कम कटौती",reschedule:"नई तारीख",callback:"कॉल करें",already_paid:"मैंने भर दिया"},
-      say:{pay_today:"Abhi pay karta hoon",pay_later:"Kal de dunga",lower_deduction:"Thoda kam kato",reschedule:"Date aage badhao",callback:"Call karo",already_paid:"Maine already pay kiya"}}
+      opt:{pay_today:"अभी भरूँगा",pay_later:"कल भरूँगा",skip_today:"आज नहीं भर पाऊँगा",lower_deduction:"कम कटौती",reschedule:"नई तारीख",callback:"कॉल करें",already_paid:"मैंने भर दिया"},  // HI: needs native review (skip_today)
+      say:{pay_today:"Abhi pay karta hoon",pay_later:"Kal de dunga",skip_today:"Aaj nahi de paunga, kal kaat lena",lower_deduction:"Thoda kam kato",reschedule:"Date aage badhao",callback:"Call karo",already_paid:"Maine already pay kiya"},
+      skipQ:"आज नहीं भर पाएँगे?",why:"कारण बताना चाहें? (ज़रूरी नहीं)",  // HI: needs native review
+      reasons:{low_sales:"बिक्री कम रही",shop_closed:"दुकान बंद थी",family_function:"परिवार में कार्यक्रम",bank_problem:"बैंक/UPI में दिक्कत",other:"कुछ और",none:"नहीं बताना"},  // HI: needs native review
+      other:"Aaj nahi de paunga, kal kaat lena. Kaaran: ",
+      pick:"कॉल का समय चुनिए (आपके संपर्क समय में):",booked:"कॉल बुक हो गई"}  // HI: needs native review
 };
 
 function notice(p){
@@ -344,7 +363,7 @@ async function init(){
   await select(META.personas[1].merchant_id);
 }
 
-async function select(id){cvOut="";
+async function select(id){cvOut="";booked=null;
   mid=id;$("#persona").value=id;last=null;offerBlocked=null;
   const p=P[id];
   const meta=await api("/merchant/personas");meta.personas.forEach(q=>P[q.merchant_id].day=q.day);
@@ -359,7 +378,7 @@ async function select(id){cvOut="";
 async function refresh(){
   const c=await api(`/merchant/${mid}/consent`);
   renderPhone(c);
-  await Promise.all([loadLedger(),loadAudit(),loadReqs(),loadDash()]);
+  await Promise.all([loadLedger(),loadAudit(),loadReqs(),loadDash(),loadSkips()]);
 }
 
 // Without permission Pakka never contacts the owner, but the owner can always write in:
@@ -395,7 +414,7 @@ function renderPhone(c){
     :lang==="hi"?(cl.mode==="llm"?`${cl.provider} AI, सुरक्षा शब्द-सूची से दोबारा जाँचा गया`:"एक अंदरूनी शब्द-सूची (बिना इंटरनेट के)")  // HI: needs native review
     :(cl.mode==="llm"?`${cl.provider[0].toUpperCase()+cl.provider.slice(1)} AI, double-checked by a safety word list`:"a built-in word list (works offline)");
   $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="hi"?"–":" to "}${hh(w[1])} · ${t.perm}: ${c.consent?.notice_version||META.notice_version} · ${t.reader}: ${reader}`;
-  $("#micNote").textContent=t.micNote;
+  $("#micNote").textContent=t.micNote;$("#skipBtn").textContent=t.skipQ;
   renderCard();
   const ob=$("#offers");ob.disabled=!!offerBlocked;ob.textContent=offerBlocked?`${t.offersNo}${tech?" ("+offerBlocked+")":""}`:t.offers;
 }
@@ -414,10 +433,41 @@ function renderCard(){
   el.innerHTML=`<div class="eb"><span>Pakka ✦ <button class="listen" id="listenCard">${t.listen}</button></span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
     ${r.options.length?`<div class="opts">${r.options.map(o=>`<button data-opt="${o}">${t.opt[o]}</button>`).join("")}</div>`:""}
     <div class="chips">${chips.map(([k,c])=>`<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>`;
-  el.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>reply(T[lang].say[b.dataset.opt]));
+  el.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>b.dataset.opt==="skip_today"?showReasons(el):reply(T[lang].say[b.dataset.opt]));
+  if(r.action==="human_callback_booking"&&r.callback_slots?.length&&!booked){
+    const d=document.createElement("div");d.className="slots";
+    d.innerHTML=`<small>${t.pick}</small>`+r.callback_slots.map(x=>`<button data-slot="${x}">${fmtSlot(x)}</button>`).join("");
+    el.appendChild(d);d.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>book(b.dataset.slot))}
+  if(booked){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag">✓ ${t.booked}</span><div>${esc(lang==="hi"?booked.message_hi:booked.message_en)}</div>`;el.appendChild(d)}
   $("#listenCard").onclick=()=>speakCard(msg.replace(/upi:\/\/\S+/g,lang==="hi"?"भुगतान लिंक":"the pay link"));
 }
 
+// "Can't pay today": optional reason chips. A reason is never required.
+let booked=null;
+function showReasons(host){
+  const t=T[lang];host=host||$("#card");host.querySelector(".reasons")?.remove();
+  const d=document.createElement("div");d.className="reasons";
+  d.innerHTML=`<small>${t.why}</small>`+Object.entries(t.reasons).map(([k,l])=>`<button data-reason="${k}">${l}</button>`).join("");
+  host.appendChild(d);
+  d.querySelectorAll("[data-reason]").forEach(b=>b.onclick=()=>{const k=b.dataset.reason;
+    if(k==="other"){const box=$("#replyText");box.value=t.other;box.focus();pendingReason="other";d.remove();return}
+    reply(t.say.skip_today,k==="none"?null:k)});
+}
+let pendingReason=null;
+function fmtSlot(x){const d=new Date(x);return d.toLocaleString(lang==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
+async function book(slot){
+  booked=await post(`/merchant/${mid}/callbacks`,{slot});
+  toast(lang==="hi"?booked.message_hi:booked.message_en);await refresh();
+}
+async function loadSkips(){
+  const s=await api(`/merchant/${mid}/skips`);
+  const mode=s.lender_mode==="auto_carry_forward"?`The lender's plan allows ${s.max_auto_per_30_days} carry-forwards in 30 days`:"The lender decides every request";
+  $("#skips").innerHTML=`<div><b style="font-size:20px">${s.requests_30d}</b> request${s.requests_30d===1?"":"s"} · <span class="muted">${tech?s.lender_mode:mode}</span></div>`+
+    (s.flag?`<div class="skipflag">${esc(s.flag)}</div>`:"")+
+    (s.days.length?`<div class="muted">Days: ${s.days.map(d=>dateOf(+d.slice(8,10))).join(", ")}</div>`:`<p class="muted">No requests yet.</p>`)+
+    (s.stress_flags.length?`<div class="muted">Stress flag set ${esc(s.stress_flags.at(-1).at.slice(5,10))}: no loan offers for 90 days.</div>`:"")+
+    s.appointments.map(a=>`<div class="req"><b>Callback</b> · ${esc(fmtSlot(a.slot))} · <span class="chip ok">${esc(a.status==="booked"?"Booked":a.status)}</span>${tech?" · "+esc(a.appointment_id):""}<br><span class="muted">Reminder to the shop at ${esc(a.reminder_at.slice(11,16))}, inside their contact hours</span></div>`).join("");
+}
 async function grant(){
   let from=+$("#c_from").value,to=+$("#c_to").value;if(to<=from){from=8;to=19}
   const body={notice_version:META.notice_version,language:lang,early_warning_alerts:$("#c_ew").checked,soundbox_cue:$("#c_sb").checked,repeat_offers:$("#c_ro").checked,channel:"app",contact_window:[from,to]};
@@ -439,9 +489,10 @@ async function runDay(){
 }
 async function nextDay(){const d=Math.min(+$("#day").value+1,META.days);setDay(d);return runDay()}
 
-async function reply(text){
+async function reply(text,reason){
   text=(text??$("#replyText").value).trim();if(!text)return;$("#replyText").value="";
-  last=await post(`/merchant/${mid}/reply`,{text});await refresh();return last;
+  if(reason===undefined){reason=pendingReason}pendingReason=null;booked=null;
+  last=await post(`/merchant/${mid}/reply`,{text,reason:reason||null});await refresh();return last;
 }
 async function offers(){
   const r=await api(`/merchant/${mid}/offers`);
@@ -501,7 +552,7 @@ $("#persona").onchange=e=>select(e.target.value);
 $("#day").oninput=e=>setDay(+e.target.value);
 $("#run").onclick=runDay;$("#next").onclick=nextDay;
 $("#send").onclick=()=>reply();$("#replyText").onkeydown=e=>{if(e.key==="Enter")reply()};
-$("#offers").onclick=offers;$("#withdraw").onclick=withdraw;
+$("#offers").onclick=offers;$("#skipBtn").onclick=()=>showReasons($("#card"));$("#withdraw").onclick=withdraw;
 $("#replay").onclick=()=>playCue(lastCue);
 $("#tech").onchange=async e=>{tech=e.target.checked;await refresh()};
 $("#reset").onclick=async()=>{await post("/merchant/reset");last=null;cvOut="";declined={};offerBlocked=null;lastCue=null;toast("Demo reset.");await select(mid)};
@@ -539,6 +590,10 @@ async function tour(){
     ["They tap loan offers. Pakka won't offer a new loan to someone who is struggling.","#offers",offers],
     ["The lender sees every request and decides. Pakka never decides anything about the loan.","#reqPanel",null],
     ["Everything Pakka did is written down. Safety rules broken: 0.","#dash",null],
+    ["A fruit cart has a slow day. The owner taps \"Can't pay today\". Pakka explains the lender's own carry-forward: today's amount comes from tomorrow's sales.","#card",async()=>{await go("fruit_cart",5);await allow();await runDay();await reply(T[lang].say.skip_today,"low_sales")}],
+    ["Next day, the same again. Pakka confirms it, without asking why again, and no new loan offers for 90 days.","#card",async()=>{setDay(6);await runDay();await reply(T[lang].say.skip_today,null)}],
+    ["A third day in a row. Pakka doesn't keep pushing: it checks in, and offers a call with a person at a time inside the shop's hours.","#card",async()=>{setDay(7);await runDay();await reply(T[lang].say.skip_today,null)}],
+    ["The owner picks a time. The callback appears in the lender's view, with a reminder inside contact hours.","#skipPanel",async()=>{const b=document.querySelector("#card [data-slot]");if(b)await book(b.dataset.slot)}],
   ];
   await sleep(800);
   for(let i=0;i<S.length;i++){

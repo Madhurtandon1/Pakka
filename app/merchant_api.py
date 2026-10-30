@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -26,6 +26,11 @@ desk = Desk()
 class ReplyIn(BaseModel):
     text: str
     now: str | None = None          # "HH:MM" on the current simulated day
+    reason: str | None = None       # optional "can't pay today" reason chip; never required
+
+
+class CallbackIn(BaseModel):
+    slot: datetime                  # one of the times offered with human_callback_booking
 
 
 class SpeakIn(BaseModel):
@@ -118,7 +123,39 @@ def simulate_day(mid: str, day: int = Query(ge=1, le=DAYS), now: str | None = No
 def reply(mid: str, body: ReplyIn):
     _persona(mid)
     day = desk.store.sim_day(mid)
-    return desk.run_reply(mid, body.text, desk.at(mid, day, _hhmm(body.now, "18:05")), day)
+    return desk.run_reply(mid, body.text, desk.at(mid, day, _hhmm(body.now, "18:05")), day, body.reason)
+
+
+@router.post("/{mid}/callbacks")
+def book_callback(mid: str, body: CallbackIn):
+    """Book a call with a person at the lender. Only inside the merchant's contact hours."""
+    _persona(mid)
+    try:
+        return desk.book_callback(mid, body.slot.replace(tzinfo=None))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{mid}/skips")
+def skip_summary(mid: str):
+    """"Can't pay today" requests in the last 30 days, flags and booked callbacks, for the lender view."""
+    p = _persona(mid)
+    today = desk.date_of(mid, desk.store.sim_day(mid))
+    days = desk.store.skip_days(mid, p.loan.loan_id, today - timedelta(days=policy.skip_rules()["window_days"] - 1), today)
+    appts = desk.store.appointments(merchant_id=mid)
+    n = len(days)
+    flag = None
+    if n >= policy.skip_rules()["callback_at_request"]:
+        flag = f"Asked to skip {n} times this month" + (" — callback booked" if appts else " — callback offered")
+    return {"merchant_id": mid, "lender_mode": p.lender.skip_day_policy.mode,
+            "max_auto_per_30_days": p.lender.skip_day_policy.max_auto_per_30_days,
+            "requests_30d": n, "days": [d.isoformat() for d in days], "flag": flag,
+            "stress_flags": desk.store.flags(mid), "appointments": appts}
+
+
+@router.get("/lender/appointments")
+def lender_appointments(lender_id: str | None = None):
+    return desk.store.appointments(lender_id=lender_id)
 
 
 @router.get("/{mid}/offers")

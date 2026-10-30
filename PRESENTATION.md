@@ -227,6 +227,7 @@ The new rules sit in a separate extension that runs after the unchanged original
 | G6 lender scope | An action the lender hasn't enabled goes to a person |
 | G7 attempts | The third attempt in an episode goes to a person |
 | G8 distress | Hardship (including illness, bereavement, weddings, flood and other calamities), dispute or "already paid" → person, and contact stops |
+| G10 skip limit | Pakka may confirm the lender's own carry-forward only for a lender that allows it, and only within that lender's preset limit; otherwise the request goes to the lender, or to a person |
 | G9 no decisions | Approve, waive, reschedule and similar actions are impossible (raises an error; tested) |
 
 ### Consent, done properly
@@ -274,6 +275,21 @@ The new rules sit in a separate extension that runs after the unchanged original
 
 ---
 
+### "Can't pay today" (new)
+
+**Principle:** Pakka explains the lender's carry-forward and applies only the lender's preset limit; it never decides to skip a payment.
+
+| "Can't pay today" request (rolling 30 days, one per day) | Lender `auto_carry_forward` (Demo NBFC A, limit 2) | Lender `request_only` (Demo Bank B) |
+|---|---|---|
+| 1st | `acknowledge_carry_forward`: "Okay. Today's amount will be collected from tomorrow's sales, as your lender's plan allows. Charges as per your loan agreement." + optional "Pay part now" link | `route_skip_request` → lender decides (`pending_lender_decision`), no promise |
+| 2nd | Same, no reason asked again; **stress flag set** (G4 blocks loan offers for 90 days) | Same; stress flag set |
+| 3rd, or 3 days in a row, or over the lender's limit | `human_callback_booking`: "Is everything okay? A person from {lender} can help you plan this." + call times inside the shop's contact hours (next 3 days); booking creates an appointment and a reminder at that time, inside contact hours; automatic handling stops | Same |
+| Any distress (text, or a reason meaning illness, death or calamity) | Existing hardship handoff (G8), contact stops | Same |
+
+Demo: **Verma Fruit Cart**, days 5, 6 and 7 (also at the end of the guided tour). Separate eval pass: 319 skip replies, **0 guard violations**; the headline merchant numbers (7,081 runs, 0 violations, 41/41) are unchanged. Blind v1 keyword labels: identical before and after.
+
+---
+
 ## 6. The AI evidence: blind Hindi test
 
 A teammate who had never seen the code wrote **50 replies in Devanagari** (blind set v1). We report what we optimise: **distressed merchants who received an automated payment nudge.**
@@ -301,7 +317,7 @@ A teammate who had never seen the code wrote **50 replies in Devanagari** (blind
 
 | | |
 |---|---|
-| **Tests** | 274 pytest tests (145 loan journey, 129 merchants): detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
+| **Tests** | 317 pytest tests (145 loan journey, 172 merchants) plus 28 browser tests of the merchant demo: detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
 | **CI** | GitHub Actions runs the tests, `run_eval.py`, `holdout.py` and `merchant_eval.py` on every push |
 | **Docker** | `docker build -t pakka .` runs the evals at build time; `.dockerignore` keeps secrets out of the image |
 | **Secrets** | Keys live only in `.env`, which is git-ignored and never printed. The git history has been scanned clean |
@@ -386,7 +402,8 @@ From news reports of the 26 Oct Q2 FY27 release and earlier releases. **Confirm 
 | Optional LLM labelling: Sarvam, Gemini, Anthropic | ✅ Working, blind-tested |
 | Landing page, both demos, both guided tours | ✅ Working; tours checked in a browser |
 | Loan document steps: PAN, Aadhaar OTP, selfie, bank, auto-pay, income PDFs | ✅ Working (25/25 separate scenarios) |
-| 274 tests, CI, Docker | ✅ Passing |
+| "Can't pay today": carry-forward explained, lender routing, callback booking, G10 | ✅ Working (0 violations in a separate pass) |
+| 317 tests + 28 browser tests, CI, Docker | ✅ Passing |
 | Second blind test set | 🔜 Next step |
 | Pilot with real data | 🔜 Next step |
 

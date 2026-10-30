@@ -36,6 +36,13 @@ class _Serialised:
         return getattr(self._conn, name)
 
 SCHEMA = """
+create table if not exists merchant_flags (
+    id integer primary key autoincrement, merchant_id text, kind text, at text, note text
+);
+create table if not exists merchant_appointments (
+    appointment_id text primary key, merchant_id text, loan_id text, lender_id text, slot text,
+    reminder_at text, status text, reason text, created_at text
+);
 create table if not exists merchant_consent (
     id integer primary key autoincrement, merchant_id text, notice_version text, language text,
     early_warning_alerts integer, soundbox_cue integer, repeat_offers integer,
@@ -59,7 +66,8 @@ create table if not exists merchant_audit (
 create table if not exists merchant_sim (merchant_id text primary key, day integer);
 """
 
-TABLES = ["merchant_consent", "merchant_episodes", "merchant_requests", "merchant_audit", "merchant_sim"]
+TABLES = ["merchant_consent", "merchant_episodes", "merchant_requests", "merchant_audit", "merchant_sim",
+          "merchant_flags", "merchant_appointments"]
 
 
 class MerchantStore:
@@ -173,7 +181,43 @@ class MerchantStore:
             f"select max(ts) from merchant_audit where merchant_id = ? and "
             f"(intent in ({marks}) or action = 'human_handoff')",
             (merchant_id, *sorted(DISTRESS))).fetchone()[0]
-        return date.fromisoformat(r[:10]) if r else None
+        f = self.db.execute("select max(at) from merchant_flags where merchant_id = ? and kind = 'stress'",
+                            (merchant_id,)).fetchone()[0]
+        marks_ = [date.fromisoformat(x[:10]) for x in (r, f) if x]
+        return max(marks_) if marks_ else None
+
+    # "Can't pay today": counted from the audit log, one per day, over a rolling window.
+    def skip_days(self, merchant_id: str, loan_id: str, since: date, until: date) -> list[date]:
+        rows = self.db.execute(
+            "select distinct substr(ts, 1, 10) from merchant_audit where merchant_id = ? and loan_id = ? "
+            "and intent = 'request_skip_today' and substr(ts, 1, 10) between ? and ?",
+            (merchant_id, loan_id, since.isoformat(), until.isoformat()))
+        return sorted(date.fromisoformat(r[0]) for r in rows)
+
+    def add_flag(self, merchant_id: str, kind: str, at: datetime, note: str = "") -> None:
+        self._write("insert into merchant_flags (merchant_id, kind, at, note) values (?, ?, ?, ?)",
+                    (merchant_id, kind, at.isoformat(), note))
+
+    def flags(self, merchant_id: str) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select * from merchant_flags where merchant_id = ? order by at", (merchant_id,))]
+
+    # Callbacks a merchant booked with a person at the lender.
+    def add_appointment(self, merchant_id: str, loan_id: str, lender_id: str, slot: datetime,
+                        reminder_at: datetime, at: datetime, reason: str = "") -> dict:
+        aid = "APT-" + uuid.uuid4().hex[:8].upper()
+        self._write("insert into merchant_appointments values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (aid, merchant_id, loan_id, lender_id, slot.isoformat(), reminder_at.isoformat(),
+                     "booked", reason, at.isoformat()))
+        return self.appointments(merchant_id=merchant_id)[0]
+
+    def appointments(self, lender_id: str | None = None, merchant_id: str | None = None) -> list[dict]:
+        q, args = "select * from merchant_appointments where 1 = 1", ()
+        if lender_id:
+            q, args = q + " and lender_id = ?", args + (lender_id,)
+        if merchant_id:
+            q, args = q + " and merchant_id = ?", args + (merchant_id,)
+        return [dict(r) for r in self.db.execute(q + " order by created_at desc", args)]
 
     # Lender requests: Pakka only routes them; the lender decides.
     def add_request(self, merchant_id: str, loan_id: str, lender_id: str, kind: str, note: str,

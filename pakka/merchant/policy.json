@@ -2,15 +2,37 @@
   "notice_version": "merchant-ews-v1",
   "max_attempts_before_handoff": 3,
   "intent_actions": {
-    "will_pay_today":          ["send_pay_link"],
-    "will_pay_later":          ["schedule_reminder", "send_pay_link"],
-    "request_lower_deduction": ["route_lower_deduction_request"],
-    "request_reschedule":      ["route_reschedule_request"],
-    "request_callback":        ["schedule_callback"],
-    "already_paid":            ["human_handoff"],
-    "dispute":                 ["human_handoff"],
-    "hardship":                ["human_handoff"],
-    "unclear":                 ["schedule_callback"]
+    "will_pay_today": [
+      "send_pay_link"
+    ],
+    "will_pay_later": [
+      "schedule_reminder",
+      "send_pay_link"
+    ],
+    "request_lower_deduction": [
+      "route_lower_deduction_request"
+    ],
+    "request_reschedule": [
+      "route_reschedule_request"
+    ],
+    "request_callback": [
+      "schedule_callback"
+    ],
+    "already_paid": [
+      "human_handoff"
+    ],
+    "dispute": [
+      "human_handoff"
+    ],
+    "hardship": [
+      "human_handoff"
+    ],
+    "unclear": [
+      "schedule_callback"
+    ],
+    "request_skip_today": [
+      "acknowledge_carry_forward"
+    ]
   },
   "blocker_first_action": {
     "edi_shortfall": "notify_shortfall",
@@ -18,9 +40,25 @@
     "cured": "no_action"
   },
   "needs_consent": {
-    "notify_shortfall": true, "send_pay_link": false, "schedule_reminder": true,
-    "route_lower_deduction_request": true, "route_reschedule_request": true,
-    "schedule_callback": true, "human_handoff": true, "show_repeat_offer": true,
-    "no_action": false
+    "notify_shortfall": true,
+    "send_pay_link": false,
+    "schedule_reminder": true,
+    "route_lower_deduction_request": true,
+    "route_reschedule_request": true,
+    "schedule_callback": true,
+    "human_handoff": true,
+    "show_repeat_offer": true,
+    "no_action": false,
+    "acknowledge_carry_forward": false,
+    "route_skip_request": true,
+    "human_callback_booking": true
+  },
+  "skip_today": {
+    "_note": "\"Can't pay today\". Pakka never decides to skip or move a payment: it explains the lender's own carry-forward (only within the lender's preset limit), routes the request to the lender, or brings in a person. Counts come from the audit log over a rolling window.",
+    "window_days": 30,
+    "callback_at_request": 3,
+    "callback_at_consecutive_days": 3,
+    "stress_flag_at_request": 2,
+    "callback_days_ahead": 3
   }
 }
