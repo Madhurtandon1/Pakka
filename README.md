@@ -99,6 +99,8 @@ uvicorn app.main:app --reload    # open http://localhost:8000
 
 Or with Docker: `docker build -t pakka . && docker run -p 8000:8000 pakka`
 
+To put it online, see [DEPLOY.md](DEPLOY.md): one-click Render Blueprint (`render.yaml`) or Vercel (`vercel.json`).
+
 The landing page is at `/`, the loan-journey demo at `/demo` and the merchant demo at `/merchant`. Add `?tour=1` to watch the demo click through itself with captions.
 
 To try it, open `/demo` and go to the KYC step. Choose a sample file (**Good photo**, **Corner cut off**, **Blurry**, **Glare** or **Wrong file**) or **Your own photo…**. A preview shows the file before anything is sent, and **Submit this document** runs the real OpenCV check on it. Submit a bad sample twice and Pakka pops up with a fix in English or Hindi. Accept it, fail once more, and it hands you to a person. The samples are drawn by `pakka/samples.py` (served at `/samples/{kind}`) and are marked "SAMPLE · DEMO ONLY". Use the clock buttons to test timeouts and the loan offer screen.

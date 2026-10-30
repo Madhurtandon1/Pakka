@@ -1,0 +1,15 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# New > Blueprint > pick this repo. Render builds the Dockerfile (which also runs the evals,
+# so a broken safety rule fails the deploy) and serves the app on the port it assigns.
+services:
+  - type: web
+    name: pakka
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Optional: Sarvam Bulbul voice. Leave empty to use the browser's voice.
+      - key: SARVAM_API_KEY
+        sync: false

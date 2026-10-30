@@ -1,0 +1,13 @@
+# Keep secrets and anything the running app doesn't need out of the Vercel bundle.
+.env
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+*.db
+tests
+docs
+Dockerfile
+render.yaml
