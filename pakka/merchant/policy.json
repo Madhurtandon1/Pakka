@@ -1,0 +1,26 @@
+{
+  "notice_version": "merchant-ews-v1",
+  "max_attempts_before_handoff": 3,
+  "intent_actions": {
+    "will_pay_today":          ["send_pay_link"],
+    "will_pay_later":          ["schedule_reminder", "send_pay_link"],
+    "request_lower_deduction": ["route_lower_deduction_request"],
+    "request_reschedule":      ["route_reschedule_request"],
+    "request_callback":        ["schedule_callback"],
+    "already_paid":            ["human_handoff"],
+    "dispute":                 ["human_handoff"],
+    "hardship":                ["human_handoff"],
+    "unclear":                 ["schedule_callback"]
+  },
+  "blocker_first_action": {
+    "edi_shortfall": "notify_shortfall",
+    "sales_dip_risk": "notify_shortfall",
+    "cured": "no_action"
+  },
+  "needs_consent": {
+    "notify_shortfall": true, "send_pay_link": false, "schedule_reminder": true,
+    "route_lower_deduction_request": true, "route_reschedule_request": true,
+    "schedule_callback": true, "human_handoff": true, "show_repeat_offer": true,
+    "no_action": false
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "labels": {
+    "will_pay_later": 10,
+    "will_pay_today": 9,
+    "already_paid": 4,
+    "hardship": 10,
+    "dispute": 7,
+    "unclear": 9,
+    "request_callback": 1
+  },
+  "keywords": {
+    "distress_got_payment_nudge": 0,
+    "nudged": [],
+    "distress_proper_handoff": 19,
+    "n": 50,
+    "correct": 44,
+    "accuracy": 0.88,
+    "distress_samples": 21,
+    "distress_missed": 2,
+    "distress_reaching_a_person": 21,
+    "misses": [
+      {
+        "text": "अभी पैसों का थोड़ा इंतजाम नहीं हुआ है, कल भेजता हूं",
+        "want": "will_pay_later",
+        "got": "hardship"
+      },
+      {
+        "text": "आज नहीं हो पाएगा, कल सुबह सबसे पहले कर दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "आज रात तक आपके खाते में पैसे आ जाएंगे",
+        "want": "will_pay_today",
+        "got": "unclear"
+      },
+      {
+        "text": "सारा पैसा माल खरीदने में लग गया है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+        "want": "hardship",
+        "got": "unclear"
+      }
+    ]
+  },
+  "llm_provider": "gemini",
+  "llm_model": "gemini-3.5-flash-lite",
+  "blindness": "Keywords are NOT blind on v1: they were tuned after seeing it. The LLM IS blind on v1: its prompt contains none of these replies and no rule learned from them.",
+  "llm_errors": 0,
+  "llm_answered": 50,
+  "llm": {
+    "distress_got_payment_nudge": 0,
+    "nudged": [],
+    "distress_proper_handoff": 21,
+    "n": 50,
+    "correct": 41,
+    "accuracy": 0.82,
+    "distress_samples": 21,
+    "distress_missed": 0,
+    "distress_reaching_a_person": 21,
+    "misses": [
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "request_reschedule"
+      },
+      {
+        "text": "भाई मेरे खाते से पैसे कट चुके हैं",
+        "want": "dispute",
+        "got": "already_paid"
+      },
+      {
+        "text": "मेरा पुराना बकाया तो पहले ही चुकता हो चुका है",
+        "want": "already_paid",
+        "got": "dispute"
+      },
+      {
+        "text": "अच्छा भाई देखते हैं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "अभी ग्राहक बैठे हैं, बाद में बात करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "कल दुकान पर आना, बैठकर बात करेंगे",
+        "want": "unclear",
+        "got": "request_reschedule"
+      },
+      {
+        "text": "भाई अभी मीटिंग में हूं",
+        "want": "unclear",
+        "got": "request_callback"
+      },
+      {
+        "text": "देखता हूं क्या हो सकता है",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "अभी थोड़ा व्यस्त हूं, बाद में मैसेज करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      }
+    ]
+  },
+  "combined": {
+    "distress_got_payment_nudge": 0,
+    "nudged": [],
+    "distress_proper_handoff": 21,
+    "n": 50,
+    "correct": 44,
+    "accuracy": 0.88,
+    "distress_samples": 21,
+    "distress_missed": 0,
+    "distress_reaching_a_person": 21,
+    "misses": [
+      {
+        "text": "अभी पैसों का थोड़ा इंतजाम नहीं हुआ है, कल भेजता हूं",
+        "want": "will_pay_later",
+        "got": "hardship"
+      },
+      {
+        "text": "आज नहीं हो पाएगा, कल सुबह सबसे पहले कर दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "request_reschedule"
+      },
+      {
+        "text": "आज रात तक आपके खाते में पैसे आ जाएंगे",
+        "want": "will_pay_today",
+        "got": "unclear"
+      },
+      {
+        "text": "कल दुकान पर आना, बैठकर बात करेंगे",
+        "want": "unclear",
+        "got": "request_reschedule"
+      },
+      {
+        "text": "भाई अभी मीटिंग में हूं",
+        "want": "unclear",
+        "got": "request_callback"
+      }
+    ]
+  },
+  "llm_usage_tokens": "not reported (or all answers reused from cache)"
+}

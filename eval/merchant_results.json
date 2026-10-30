@@ -1,0 +1,62 @@
+{
+  "merchants": 205,
+  "days": 30,
+  "rescues": 7081,
+  "guard_violations": 0,
+  "violations": [],
+  "detection": {
+    "r1_precision": 1.0,
+    "r1_recall": 1.0,
+    "shortfall_days": 639,
+    "note": "vs the lender ledger itself, so this checks the rule is wired correctly"
+  },
+  "episodes": 166,
+  "episodes_cured": 124,
+  "distress_replies": 41,
+  "distress_handoff_rate": 1.0,
+  "intent_keywords": {
+    "samples": 31,
+    "correct": 29,
+    "accuracy": 0.935,
+    "note": "hand-written samples, written alongside the keyword lists"
+  },
+  "actions": {
+    "no_action": 6447,
+    "notify_shortfall": 442,
+    "show_repeat_offer": 95,
+    "human_handoff": 53,
+    "schedule_reminder": 8,
+    "schedule_callback": 14,
+    "send_pay_link": 11,
+    "route_reschedule_request": 5,
+    "route_lower_deduction_request": 6
+  },
+  "intents": {
+    "already_paid": 13,
+    "hardship": 19,
+    "will_pay_later": 9,
+    "request_callback": 9,
+    "will_pay_today": 13,
+    "request_reschedule": 6,
+    "dispute": 9,
+    "request_lower_deduction": 10,
+    "unclear": 9
+  },
+  "guard_blocks": {
+    "G1_consent": 121,
+    "G2_hours": 337,
+    "G4_no_upsell": 42,
+    "G3_daily_cap": 17,
+    "G8_distress": 41,
+    "G8_stopped": 252,
+    "G1_skipped": 4,
+    "G3_cadence": 44,
+    "G7_attempts": 8,
+    "G6_lender_scope": 4
+  },
+  "latency": {
+    "p50_ms": 1.04,
+    "p95_ms": 2.93,
+    "note": "keyword path, no network"
+  }
+}

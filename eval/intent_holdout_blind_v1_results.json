@@ -1,0 +1,170 @@
+{
+  "labels": {
+    "will_pay_later": 10,
+    "will_pay_today": 9,
+    "already_paid": 4,
+    "hardship": 10,
+    "dispute": 7,
+    "unclear": 9,
+    "request_callback": 1
+  },
+  "keywords": {
+    "n": 50,
+    "correct": 22,
+    "accuracy": 0.44,
+    "distress_samples": 21,
+    "distress_missed": 15,
+    "misses": [
+      {
+        "text": "भाई इस हफ्ते पूरा हिसाब कर दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "सैलरी आने दो, फिर आपका पैसा दे दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "रविवार तक पक्का पैसे भेज दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "अगले हफ्ते तक उधार पूरा चुका दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "भाई QR कोड भेज दो, पैसे डाल देता हूं",
+        "want": "will_pay_today",
+        "got": "unclear"
+      },
+      {
+        "text": "पेमेंट कर दी है, एक बार चेक कर लेना",
+        "want": "already_paid",
+        "got": "unclear"
+      },
+      {
+        "text": "आज दुकान बंद करने से पहले पेमेंट कर दूंगा",
+        "want": "will_pay_today",
+        "got": "hardship"
+      },
+      {
+        "text": "भाई अभी दुकान में बिल्कुल बिक्री नहीं हो रही है",
+        "want": "hardship",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "इस महीने तो बहुत नुकसान हो गया है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "घर में भी थोड़ी परेशानी चल रही है साहब",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "सारा पैसा माल खरीदने में लग गया है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "ग्राहकों ने उधार ले रखा है, मेरे पास नकद नहीं है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "भाई धंधा बहुत मंदा चल रहा है आजकल",
+        "want": "hardship",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "अभी खाते में पैसे ही नहीं हैं",
+        "want": "hardship",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "थोड़ा समझिए भाई, अभी हालात ठीक नहीं हैं",
+        "want": "hardship",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "भाई मेरे खाते से पैसे कट चुके हैं",
+        "want": "dispute",
+        "got": "unclear"
+      },
+      {
+        "text": "मैंने इतना उधार लिया ही नहीं था",
+        "want": "dispute",
+        "got": "unclear"
+      },
+      {
+        "text": "पेमेंट सफल दिखा रहा है, फिर बकाया क्यों है?",
+        "want": "dispute",
+        "got": "unclear"
+      },
+      {
+        "text": "भाई ट्रांजैक्शन आईडी भेज देता हूं, चेक कर लो",
+        "want": "already_paid",
+        "got": "unclear"
+      },
+      {
+        "text": "ये अतिरिक्त पैसे किस बात के लगा दिए?",
+        "want": "dispute",
+        "got": "unclear"
+      },
+      {
+        "text": "अभी ग्राहक बैठे हैं, बाद में बात करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "कल दुकान पर आना, बैठकर बात करेंगे",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "भाई अभी मीटिंग में हूं",
+        "want": "unclear",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "शाम को फोन कर लेना मुझे",
+        "want": "request_callback",
+        "got": "unclear"
+      },
+      {
+        "text": "अभी थोड़ा व्यस्त हूं, बाद में मैसेज करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "आज क्रिकेट का मैच कितने बजे है?",
+        "want": "unclear",
+        "got": "will_pay_today"
+      }
+    ],
+    "distress_reaching_a_person": 17,
+    "note": "4 financial-stress replies got an automatic pay/reminder message; the other 17 distress replies reached a person (handoff, or unclear -> callback).",
+    "distress_got_payment_nudge": 4,
+    "nudged": [
+      "भाई अभी दुकान में बिल्कुल बिक्री नहीं हो रही है",
+      "भाई धंधा बहुत मंदा चल रहा है आजकल",
+      "अभी खाते में पैसे ही नहीं हैं",
+      "थोड़ा समझिए भाई, अभी हालात ठीक नहीं हैं"
+    ]
+  },
+  "note": "Blind run: keywords as of 30 Oct, before anyone on the team saw this file. Labels corrected first: 5 replies relabelled to the defined label set (4 to already_paid, 1 to request_callback). This is the number to quote as the blind score."
+}

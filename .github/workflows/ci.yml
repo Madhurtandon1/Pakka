@@ -17,3 +17,4 @@ jobs:
       - run: pytest -q
       - run: python eval/run_eval.py
       - run: python eval/holdout.py
+      - run: python eval/merchant_eval.py

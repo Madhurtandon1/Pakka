@@ -93,12 +93,13 @@ On the loan offer, Pakka explains the Key Fact Statement terms when the user hes
 ```bash
 pip install -r requirements.txt
 python eval/run_eval.py          # builds eval/results.json
+python eval/merchant_eval.py     # builds eval/merchant_results.json
 uvicorn app.main:app --reload    # open http://localhost:8000
 ```
 
 Or with Docker: `docker build -t pakka . && docker run -p 8000:8000 pakka`
 
-The landing page is at `/` and the live demo at `/demo`. Add `?tour=1` to watch the demo click through itself with captions.
+The landing page is at `/`, the loan-journey demo at `/demo` and the merchant demo at `/merchant`. Add `?tour=1` to watch the demo click through itself with captions.
 
 To try it, open `/demo`, go to the KYC step and press **Corner cut off** twice. Pakka pops up with a fix in English or Hindi. Accept it, fail once more, and it hands you to a person. Use the clock buttons to test timeouts and the loan offer screen. **Upload a real photo** runs the OpenCV check on your own image.
 
@@ -141,7 +142,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-25 tests cover the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, and the full API flow.
+154 tests. 25 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, and the full API flow. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -161,6 +162,116 @@ pytest -q
 2. Train XGBoost on real event logs, keep the rules as a fallback
 3. App widget, KFS explainer on the offer screen, more languages through Sarvam
 4. Postgres, Redis event stream, and consent records in production
+
+## Pakka for Merchants
+
+The same rules-first engine (detect → decide → guard → explain → audit), applied to a second journey: shop owners repaying a merchant loan through **daily auto-deductions from their sales settlements (EDI)**. When a slow day means the deduction falls short, the merchant often only finds out after a penal charge or a credit-score hit. Pakka warns them early, safely, and in their own language, and routes any request to the lender, which makes every decision.
+
+Open `/merchant`, or `/merchant?tour=1` for the guided tour.
+
+**Background.** Paytm's merchant loans are booked by partner banks and NBFCs, and are repaid by daily deduction from settlements, with Paytm as the lending service provider. How a short day is handled (carry-forward, grace period, penal charge) is not public, so here it is **lender configuration** (`shortfall_mode`), not hardcoded behaviour. RBI's stressed-asset framework puts accounts 1–30 days past due in SMA-0, 31–60 in SMA-1 and 61–90 in SMA-2; the lender ledger reports the bucket and Pakka only displays it. These background facts came from public descriptions; check them against the current Paytm and RBI pages before you quote them.
+
+### What Pakka may do, and what the lender decides
+
+| Pakka may | Only the lender may |
+|---|---|
+| Spot a shortfall or a sales dip from the lender's ledger | Calculate dues, penal charges or interest |
+| Send a neutral Soundbox cue and an app card, in EN/HI | Approve a lower deduction, a new date, a restructure or a waiver |
+| Send a UPI pay link to the **lender's** account | Approve any new credit |
+| Set a reminder or a callback inside contact hours | Decide anything about the loan |
+| Route a request to the lender as `pending_lender_decision` | |
+| Hand off to a person, with the grievance officer | |
+
+### Design rules (enforced in code, tested, and re-checked by the eval)
+
+| Guard | Rule |
+|---|---|
+| G1 | No contact without active, versioned consent; offers need their own consent. A merchant's own dispute or hardship reply always reaches a person, even without consent |
+| G2 | Proactive contact only inside the merchant's chosen hours (never wider than 08:00–19:00); otherwise deferred |
+| G3 | At most one proactive contact a day, and during a shortfall only every other day unless the SMA bucket worsens |
+| G4 | No new-credit offer while dues exist or within 90 days of a stress flag |
+| G5 | The Soundbox plays only the neutral cue: no amounts, no "overdue", no loan words |
+| G6 | Actions outside the lender's `allowed_actions` go to a person, with `policy_ok = false` |
+| G7 | The third attempt in an episode goes to a person |
+| G8 | Dispute, hardship (including bereavement, illness, weddings, flood and other calamities) or "already paid" stops the episode and goes to a person |
+| G9 | Decision actions (approve, waive, reschedule now…) raise `PolicyViolation` |
+
+The LLM never picks an action. It only labels the merchant's reply as one of nine fixed intents, after PII masking. Distress keywords always override it, and any unknown label becomes `unclear`. With no LLM configured (the default), an offline keyword classifier covering Hindi, Hinglish and English is used, so the demo needs no keys. Optional LLM providers, none required by the Docker image. Without `PAKKA_LLM_PROVIDER` the classifier stays on the offline keyword fail-safe.
+
+**Switch on Sarvam:** `pip install sarvamai`, then put these two lines in `.env` (which is git-ignored):
+```
+PAKKA_LLM_PROVIDER=sarvam
+SARVAM_API_KEY=your-key
+```
+It uses `sarvam-105b` in non-think mode with temperature 0. Override the model with `PAKKA_LLM_MODEL`. `eval/intent_holdout.py` reads `.env` itself; for the app, start it with `uvicorn app.main:app --env-file .env`.
+
+Other providers:
+- Anthropic: `pip install anthropic`, then set `PAKKA_LLM_PROVIDER=anthropic` and `PAKKA_LLM_API_KEY` (model defaults to `claude-haiku-5-5`).
+- Gemini: `pip install google-genai`, then set `PAKKA_LLM_PROVIDER=gemini`, `PAKKA_LLM_API_KEY` and `PAKKA_LLM_MODEL` (temperature 0).
+
+Both get PII-masked text and the same fixed label set. An unknown label becomes `unclear`; any error, including a 429, falls back to keywords. When combining, keyword `unclear` counts as an abstain, so the LLM decides; distress from either side wins; any other disagreement goes to a person. `eval/intent_holdout.py` spaces calls 4.5 s apart for Gemini (`PAKKA_LLM_PAUSE`), to stay under the free-tier rate limit.
+
+**Blind intent check:** `python eval/intent_holdout.py` scores the classifier on `eval/intent_holdout.json`, which should be about 50 replies written by a teammate who hasn't seen the keyword lists. It scores the LLM too if one is configured. It is not a CI gate; report the numbers it gives.
+
+**Principle: when unsure, Pakka routes to a person, never to a payment nudge.** A reply becomes `will_pay_*` only with a time word, a payment verb and no negation. Negation plus a money or sales word is hardship. Anything else is `unclear`, which goes to a person. With the LLM on, distress from either side wins, keyword `unclear` is an abstain (the LLM decides), and any other disagreement goes to a person.
+
+| Blind set v1: 50 Devanagari replies by a teammate | **Distress replies given an automated payment message** | Accuracy | Distress reaching a person |
+|---|---|---|---|
+| **Blind, keywords as written before anyone saw the set** | **4** | **22 / 50 (44%)** | 17 / 21 |
+| After the fail-safe fix (no longer blind; the 4 are now regression tests) | **0** | 44 / 50 (88%) | 21 / 21 |
+| Sarvam `sarvam-105b` alone (blind) | **5** | 39 / 50 (78%) | 16 / 21 |
+| Sarvam + keywords combined | **0** | 43 / 50 (86%) | 21 / 21 |
+| Gemini `gemini-3.5-flash-lite` alone (blind) | **0** | 41 / 50 (82%) | 21 / 21 |
+| Gemini + keywords combined | **0** | 44 / 50 (88%) | 21 / 21 |
+
+The blind run exposed four general gaps. There were no financial-distress words ("बिक्री नहीं", "नुकसान", "हालात"). A bare time word ("अभी", "कल") counted as a promise to pay even in "अभी मीटिंग में हूं"; a payment word is now also required, and otherwise the reply goes to a person. There were spelling variants (फोन / फ़ोन). And "दुकान बंद" matched "before I close the shop". The LLM rows are blind: neither prompt contains anything from v1. Sarvam alone gave 5 distress replies a payment nudge ("अभी खाते में पैसे ही नहीं हैं" → will_pay_later). The keyword fail-safe caught all five in the combined pipeline, which is why the combined rule requires every `will_pay_*` label to pass it. Only the 44% is a blind number for the keywords. A second blind set (`python eval/intent_holdout.py eval/intent_holdout_v2.json`), with romanised Hindi, typos, mixed signals and lower-deduction or reschedule requests, is the honest next measurement.
+
+| Part | File |
+|---|---|
+| Models (money in integer paise) | `pakka/merchant/models.py` |
+| Lender ledger simulator: FIFO carry-forward or prepayment credit, DPD, SMA | `pakka/merchant/ledger.py` |
+| Rules R1 shortfall, R2 arrears ageing, R3 sales-dip early warning, R4 cured | `pakka/merchant/rules.py` |
+| Intent → action policy | `pakka/merchant/policy.json` |
+| Guards G1–G9 | `pakka/merchant/guard.py` |
+| Intent classifier (keywords, optional LLM) | `pakka/merchant/intents.py` |
+| Reviewed EN/HI templates | `pakka/merchant/templates.py` |
+| LangGraph agent: day-end, reply and offer paths | `pakka/merchant/agent.py` |
+| Consent, episodes, lender requests, `merchant_audit` | `pakka/merchant/store.py` |
+| Five personas + 200 random merchants | `pakka/merchant/synth.py` |
+| API under `/merchant/...` | `app/merchant_api.py` |
+| Consent screen, Soundbox mock, app card, lender view, tour | `app/static/merchant.html` |
+
+### Demo personas
+
+| Persona | What happens |
+|---|---|
+| `kirana_steady` | Sales always cover the EDI. No contact, ever. Offers allowed |
+| `chai_seasonal` | Rain on day 10: Soundbox cue and app card. "Kal de dunga" sets a reminder (moved to 08:00 because 20:00 is outside contact hours) and a pay link. Day 11: cured, thank-you, no offer |
+| (any) | "Abhi pay karta hoon" with arrears offers two UPI links: just today's shortfall, or the total due |
+| `tailor_stress` | Early warning (R3) on day 14, shortfall on day 15. "Bimar tha, dukaan band thi" means hardship: handoff to a person, episode stopped, offers blocked (G4) |
+| `mobile_dispute` | Demo Bank B holds partial deductions as prepayment, so day 8 shows ₹600 due despite a ₹400 deduction. "Maine already pay kiya" means a handoff. Asking for a lower deduction is outside this lender's scope (G6), so that goes to a person too |
+| `general_late_night` | Shortfall detected at 21:30, deferred to 08:00 (G2) |
+
+### Evaluation
+
+`python eval/merchant_eval.py` runs the 5 personas and 200 random merchants for 30 days each, with random contact times, random consent, labelled replies and same-day reruns. It fails CI if any guard is violated, or if any distress reply isn't handed off.
+
+| What we checked | Result |
+|---|---|
+| Agent runs (day-end, replies, offers) | 7,081 |
+| Guard violations (Soundbox text, merchant hours, daily cap, every-other-day cadence, upsell, lender scope, consent, decisions) | **0** |
+| R1 against the lender ledger | precision 1.0, recall 1.0 |
+| Hardship / dispute / already-paid replies handed to a person (including 4 from merchants who never consented) | 41 / 41 |
+| Keyword intents on our own 31 labelled replies | 29 / 31 (two short replies with no payment word now go to a person) |
+| Agent latency p50 / p95 (keyword path, no network) | ~1.2 ms / ~3.4 ms |
+
+These numbers show the rules and guards behave as designed on synthetic data, nothing more. R1 is checked against the same ledger it reads, and the reply samples were written alongside the keyword lists. Real impact needs a pilot with a randomised holdout, measuring day-0 and day-7 cure rate, the SMA-0 → SMA-1 roll rate, Bucket-1 resolution, complaint rate, opt-out rate and promises to pay kept.
+
+**Not built (on purpose, for now):** server-side speech-to-text (the page uses the browser's Web Speech API and posts text), penal-charge calculation, restructuring logic, outbound calls, and any real Paytm or lender integration.
+
+### Backup demo recording
+
+If the live demo fails on stage, play a recording of the tour: open `/merchant?tour=1` in Chrome, press Win+Alt+R (Xbox Game Bar) or use any screen recorder, and let the 14 steps run (about 70 seconds). Record it the night before.
 
 ## Team
 

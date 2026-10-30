@@ -1,0 +1,189 @@
+{
+  "labels": {
+    "will_pay_later": 10,
+    "will_pay_today": 9,
+    "already_paid": 4,
+    "hardship": 10,
+    "dispute": 7,
+    "unclear": 9,
+    "request_callback": 1
+  },
+  "keywords": {
+    "distress_got_payment_nudge": 0,
+    "nudged": [],
+    "distress_proper_handoff": 19,
+    "n": 50,
+    "correct": 44,
+    "accuracy": 0.88,
+    "distress_samples": 21,
+    "distress_missed": 2,
+    "distress_reaching_a_person": 21,
+    "misses": [
+      {
+        "text": "अभी पैसों का थोड़ा इंतजाम नहीं हुआ है, कल भेजता हूं",
+        "want": "will_pay_later",
+        "got": "hardship"
+      },
+      {
+        "text": "आज नहीं हो पाएगा, कल सुबह सबसे पहले कर दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "आज रात तक आपके खाते में पैसे आ जाएंगे",
+        "want": "will_pay_today",
+        "got": "unclear"
+      },
+      {
+        "text": "सारा पैसा माल खरीदने में लग गया है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+        "want": "hardship",
+        "got": "unclear"
+      }
+    ]
+  },
+  "llm_provider": "sarvam",
+  "llm_model": "sarvam-105b",
+  "blindness": "Keywords are NOT blind on v1: they were tuned after seeing it. The LLM IS blind on v1: its prompt contains none of these replies and no rule learned from them.",
+  "llm_errors": 0,
+  "llm_answered": 50,
+  "llm": {
+    "distress_got_payment_nudge": 5,
+    "nudged": [
+      "सारा पैसा माल खरीदने में लग गया है",
+      "ग्राहकों ने उधार ले रखा है, मेरे पास नकद नहीं है",
+      "अभी खाते में पैसे ही नहीं हैं",
+      "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+      "भाई ट्रांजैक्शन आईडी भेज देता हूं, चेक कर लो"
+    ],
+    "distress_proper_handoff": 16,
+    "n": 50,
+    "correct": 39,
+    "accuracy": 0.78,
+    "distress_samples": 21,
+    "distress_missed": 5,
+    "distress_reaching_a_person": 16,
+    "misses": [
+      {
+        "text": "सारा पैसा माल खरीदने में लग गया है",
+        "want": "hardship",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "ग्राहकों ने उधार ले रखा है, मेरे पास नकद नहीं है",
+        "want": "hardship",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "अभी खाते में पैसे ही नहीं हैं",
+        "want": "hardship",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+        "want": "hardship",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "भाई मेरे खाते से पैसे कट चुके हैं",
+        "want": "dispute",
+        "got": "already_paid"
+      },
+      {
+        "text": "भाई ट्रांजैक्शन आईडी भेज देता हूं, चेक कर लो",
+        "want": "already_paid",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "अभी ग्राहक बैठे हैं, बाद में बात करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "हां जी ठीक है",
+        "want": "unclear",
+        "got": "will_pay_today"
+      },
+      {
+        "text": "कल दुकान पर आना, बैठकर बात करेंगे",
+        "want": "unclear",
+        "got": "request_callback"
+      },
+      {
+        "text": "भाई अभी मीटिंग में हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      },
+      {
+        "text": "अभी थोड़ा व्यस्त हूं, बाद में मैसेज करता हूं",
+        "want": "unclear",
+        "got": "will_pay_later"
+      }
+    ]
+  },
+  "combined": {
+    "distress_got_payment_nudge": 0,
+    "nudged": [],
+    "distress_proper_handoff": 19,
+    "n": 50,
+    "correct": 43,
+    "accuracy": 0.86,
+    "distress_samples": 21,
+    "distress_missed": 2,
+    "distress_reaching_a_person": 21,
+    "misses": [
+      {
+        "text": "अभी पैसों का थोड़ा इंतजाम नहीं हुआ है, कल भेजता हूं",
+        "want": "will_pay_later",
+        "got": "hardship"
+      },
+      {
+        "text": "आज नहीं हो पाएगा, कल सुबह सबसे पहले कर दूंगा",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "बस दो दिन और रुक जाओ भाई",
+        "want": "will_pay_later",
+        "got": "unclear"
+      },
+      {
+        "text": "आज रात तक आपके खाते में पैसे आ जाएंगे",
+        "want": "will_pay_today",
+        "got": "unclear"
+      },
+      {
+        "text": "सारा पैसा माल खरीदने में लग गया है",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "दुकान का किराया देना था, सारे पैसे वहीं चले गए",
+        "want": "hardship",
+        "got": "unclear"
+      },
+      {
+        "text": "कल दुकान पर आना, बैठकर बात करेंगे",
+        "want": "unclear",
+        "got": "request_callback"
+      }
+    ]
+  },
+  "llm_usage_tokens": {
+    "recorded_prompt_tokens": 6412,
+    "recorded_completion_tokens": 103,
+    "recorded_total_tokens": 6515,
+    "recorded_calls": 21,
+    "note": "Usage was recorded for 21 of the 50 answered calls (about 310 tokens per call); the first 29 were made before the usage counter was fixed. Estimated total for 50 calls: about 15,500 tokens. The API reports tokens, not credits."
+  },
+  "note": "Three passes over the same 50 replies: 21 calls hit 503 (server overload) on the first pass and were resumed from the saved answers, so every reply was sent until it got an answer. No reply was answered twice."
+}

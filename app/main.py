@@ -6,6 +6,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
+from app.merchant_api import router as merchant_router
 from pakka import sarvam
 from pakka.agent import rescue
 from pakka.doccheck import check_image
@@ -17,6 +18,7 @@ STATIC = Path(__file__).with_name("static")
 RESULTS = Path(__file__).resolve().parents[1] / "eval" / "results.json"
 
 app = FastAPI(title="Pakka prototype", version="0.1.0")
+app.include_router(merchant_router)
 store = Store()
 journeys: set[str] = set()
 
