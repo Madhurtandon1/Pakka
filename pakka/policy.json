@@ -9,7 +9,20 @@
     "explain_kfs": {"needs_consent": false},
     "send_resume_link": {"needs_consent": false},
     "schedule_callback": {"needs_consent": true},
-    "human_handoff": {"needs_consent": true}
+    "human_handoff": {"needs_consent": true},
+    "explain_pan_issue": {"needs_consent": false},
+    "guide_pan_aadhaar_link": {"needs_consent": true},
+    "resend_otp_tips": {"needs_consent": false},
+    "switch_to_digilocker": {"needs_consent": true},
+    "offline_aadhaar_xml": {"needs_consent": true},
+    "face_match_tips": {"needs_consent": false},
+    "guided_selfie_retake": {"needs_consent": true},
+    "explain_bank_issue": {"needs_consent": false},
+    "reenter_bank_details": {"needs_consent": true},
+    "try_another_account": {"needs_consent": true},
+    "explain_mandate_issue": {"needs_consent": false},
+    "switch_mandate_method": {"needs_consent": true},
+    "try_another_bank": {"needs_consent": true}
   },
   "blockers": {
     "bad_photo": ["guided_recapture", "human_handoff"],
@@ -17,6 +30,25 @@
     "liveness": ["retry_liveness_tips", "switch_to_video_kyc", "human_handoff"],
     "digilocker": ["digilocker_setup_help", "switch_to_video_kyc", "human_handoff"],
     "offer_jargon": ["explain_kfs", "schedule_callback", "human_handoff"],
-    "timeout": ["send_resume_link", "schedule_callback"]
+    "timeout": ["send_resume_link", "schedule_callback"],
+    "pan_problem": ["explain_pan_issue", "guide_pan_aadhaar_link", "human_handoff"],
+    "aadhaar_otp": ["resend_otp_tips", "switch_to_digilocker", "offline_aadhaar_xml", "switch_to_video_kyc", "human_handoff"],
+    "face_match": ["face_match_tips", "guided_selfie_retake", "switch_to_video_kyc", "human_handoff"],
+    "bank_verify": ["explain_bank_issue", "reenter_bank_details", "try_another_account", "human_handoff"],
+    "mandate_failed": ["explain_mandate_issue", "switch_mandate_method", "try_another_bank", "human_handoff"]
+  },
+  "code_ladders": {
+    "_note": "Optional per-cause order for a blocker. Every action here must also be in that blocker's list above (the guard checks that list).",
+    "pan_problem": {
+      "PAN_FORMAT": ["explain_pan_issue", "human_handoff"],
+      "PAN_NOT_LINKED": ["explain_pan_issue", "guide_pan_aadhaar_link", "human_handoff"],
+      "NAME_MISMATCH": ["explain_pan_issue", "human_handoff"]
+    },
+    "aadhaar_otp": {
+      "MOBILE_NOT_LINKED": ["switch_to_video_kyc", "human_handoff"]
+    },
+    "bank_verify": {
+      "ACCOUNT_NAME_MISMATCH": ["explain_bank_issue", "try_another_account", "human_handoff"]
+    }
   }
 }

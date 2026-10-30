@@ -207,6 +207,30 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 #demo button:disabled{opacity:.4;cursor:default}
 .verdict{display:inline-block;margin-top:6px;padding:4px 10px;border-radius:999px;font-weight:600;font-size:12.5px}
 .verdict.wait{background:var(--paper);color:var(--muted)}.verdict.ok{background:var(--greenBg);color:var(--green)}.verdict.bad{background:var(--amberBg);color:var(--amber)}
+.checklist{margin-bottom:16px}
+.ckhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ckhead h3{margin:0}
+.ckhead label{font-size:13.5px;color:var(--muted)}
+.ckhead select{font:500 14px var(--body);padding:6px 10px;border:1px solid var(--line);border-radius:8px;margin-left:6px;color:var(--ink)}
+.cklist{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.ck{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.ck b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
+#demo .ck span.why{display:block;font-size:12.5px;color:var(--muted);text-transform:none;letter-spacing:normal;font-weight:400;margin-top:2px}
+.ck .st{flex:none}
+.cknote{font-size:12px;color:var(--muted);margin-top:10px}
+@media(max-width:760px){.cklist{grid-template-columns:1fr}}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin:14px 0 6px}
+@media(max-width:600px){.form{grid-template-columns:1fr}}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+.form input{font:500 15px var(--body);padding:10px 12px;border:1px solid var(--line);border-radius:10px;color:var(--ink);letter-spacing:.03em;background:#fff}
+.form input[readonly]{background:var(--paper)}
+.fchk{font-size:12.5px;min-height:17px;color:var(--muted)}.fchk.ok{color:var(--green)}.fchk.bad{color:var(--amber)}
+.methods{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+#demo .methods button.on{border-color:var(--cyan);background:#EAF8FF;font-weight:600}
+.selfie{width:150px;height:150px;border-radius:50%;border:3px dashed var(--cyan);display:grid;place-items:center;margin:14px 0;color:var(--muted);font-size:13px;background:var(--paper);text-align:center}
+.okmsg{color:var(--green);font-size:13.5px;margin-top:8px;min-height:18px}
+.alt{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.alt .h{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .demo{border:1.5px dashed #C9D4E3;border-radius:14px;padding:13px 16px}
 .demo .h{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
 .demo .row{margin:6px 0 0}
@@ -286,6 +310,7 @@ body.embed .dbar{display:none}
 <div class="avatar">SP</div>
 </div>
 <div id="view-loans">
+<section class="card checklist" id="checklist"></section>
 <section class="card">
 <div class="jhead"><div><h2>Personal loan application</h2><div class="muted" id="stepno"></div></div><span class="badge">₹50,000 · 12 months</span></div>
 <div class="steps" id="steps"></div>
@@ -317,15 +342,16 @@ body.embed .dbar{display:none}
 <div class="toast" id="toast"></div>
 </section>
 <section class="card sm"><h3>What Pakka did</h3><div class="muted">Every step Pakka takes in this application is written down here.</div><table id="audit"></table></section>
-<section class="card sm"><h3>How we tested it</h3><div id="eval" class="muted">Run <code>python eval/run_eval.py</code> to fill this in.</div></section>
+<section class="card sm"><h3>How we tested it</h3><div id="eval" class="muted">Loading test results…</div></section>
 </aside>
 </div>
 <div class="cap" id="cap"><div class="n"></div><div class="t"></div><div class="prog"><i></i></div>
 <div class="row" style="display:none"><a class="pill solid" href="/demo" target="_top">Try it yourself</a><a class="pill" href="/" target="_top">Back to Pakka</a></div></div>
 </main>
 <script>
-const STEPS=["basic","kyc","offer","bank","review"];
-const LABEL={basic:"Basic details",kyc:"KYC",offer:"Loan offer",bank:"Bank",review:"Review"};
+const STEPS=["basic","pan","kyc","selfie","bank","mandate","offer","review"];
+const LABEL={basic:"Details",pan:"PAN",kyc:"Aadhaar",selfie:"Selfie",bank:"Bank",mandate:"Auto-pay",offer:"Offer",review:"Review"};
+const TITLE={basic:"Basic details",pan:"PAN",kyc:"Aadhaar e-KYC",selfie:"Selfie",bank:"Bank account",mandate:"Auto-pay setup",offer:"Loan offer",review:"Review"};
 let jid,clock=0,step="basic",lang="en",last=null,open=false,done=false;
 const $=s=>document.querySelector(s);
 
@@ -343,10 +369,17 @@ async function check(trigger){
 }
 let tech=false;   // "Show technical details": codes instead of plain words
 const PROBLEM={bad_photo:"The photo didn't go through",wrong_format:"Wrong file type",liveness:"The face check keeps failing",
-  digilocker:"No DigiLocker account",offer_jargon:"Stuck on the loan terms",timeout:"Away from the application for a while"};
+  digilocker:"No DigiLocker account",offer_jargon:"Stuck on the loan terms",timeout:"Away from the application for a while",
+  pan_problem:"A problem with the PAN",aadhaar_otp:"The Aadhaar OTP didn't work",face_match:"The selfie didn't match the ID",
+  bank_verify:"The bank account couldn't be confirmed",mandate_failed:"Auto-pay couldn't be set up"};
 const FIX={guided_recapture:"Help retaking the photo",convert_file:"Help with the file type",retry_liveness_tips:"Tips for the face check",
   switch_to_video_kyc:"A video call instead",digilocker_setup_help:"Help setting up DigiLocker",explain_kfs:"Explain the loan terms",
-  send_resume_link:"A link to continue later",schedule_callback:"A call from our team",human_handoff:"Passed to a person"};
+  send_resume_link:"A link to continue later",schedule_callback:"A call from our team",human_handoff:"Passed to a person",
+  explain_pan_issue:"Explain the PAN problem",guide_pan_aadhaar_link:"Steps to link PAN and Aadhaar",resend_otp_tips:"Tips to get the OTP",
+  switch_to_digilocker:"Use DigiLocker instead",offline_aadhaar_xml:"Use the offline Aadhaar file",face_match_tips:"Tips for the selfie",
+  guided_selfie_retake:"Help retaking the selfie",explain_bank_issue:"Explain the bank problem",reenter_bank_details:"Type the bank details again",
+  try_another_account:"Use another account",explain_mandate_issue:"Explain the auto-pay problem",switch_mandate_method:"Try another auto-pay method",
+  try_another_bank:"Use another bank for auto-pay"};
 const PHOTO={IMG_CROPPED:"a corner is cut off",IMG_BLUR:"it's blurry",IMG_GLARE:"there's glare",FILE_FORMAT:"it isn't a photo",
   NOT_AADHAAR:"it doesn't look like an Aadhaar card",AADHAAR_BACK:"this is the back of the card, and we need the front",
   AADHAAR_UNREADABLE:"the Aadhaar number couldn't be read clearly"};
@@ -358,8 +391,9 @@ function show(r){
     :[`Problem: ${PROBLEM[r.detection.blocker]||r.detection.blocker}`,`Pakka's help: ${FIX[r.action]||r.action}`,r.escalated?"escalated to a person":"",r.policy_ok?"":"Not on the allowed list, so a person takes over"];
   $("#chips").innerHTML=list.filter(Boolean).map(c=>`<span class="chip ${c.startsWith("escalated")?"warn":""}">${c}</span>`).join("");
   $("#yes").style.display=r.needs_consent?"":"none";$("#yes").textContent=lang==="hi"?"हाँ, मदद करो":"Yes, help me";
+  renderChecklist();
 }
-function hide(){open=false;$("#pakka").classList.remove("show")}
+function hide(){open=false;$("#pakka").classList.remove("show");renderChecklist()}
 
 async function relang(l){
   lang=l;document.querySelectorAll("[data-lang]").forEach(b=>b.classList.toggle("on",b.dataset.lang===l));
@@ -375,6 +409,14 @@ const EFFECT={
   digilocker_setup_help:()=>toast("DigiLocker setup guide opened (demo)."),
   schedule_callback:()=>toast("Our team will call you (demo)."),
   human_handoff:()=>toast("Passed to a person who can see everything so far (demo)."),
+  guide_pan_aadhaar_link:()=>toast("Opened the 'Link Aadhaar' steps on the Income Tax e-filing site (demo). Your application stays saved."),
+  switch_to_digilocker:()=>toast("DigiLocker opened (demo). Your Aadhaar details will come from there."),
+  offline_aadhaar_xml:()=>toast("Offline Aadhaar upload opened (demo): upload the ZIP from UIDAI with its share code."),
+  guided_selfie_retake:()=>toast("Selfie guide on: keep your face inside the circle and hold still (demo)."),
+  reenter_bank_details:()=>{["#acct","#ifscIn"].forEach(i=>{const el=$(i);if(el)el.value=""});const c=$("#ifscChk");if(c)c.textContent="";$("#acct")?.focus()},
+  try_another_account:()=>toast("You can add a different savings account in your own name (demo)."),
+  switch_mandate_method:()=>{method="upi";drawMethods();toast("Switched to UPI AutoPay. Tap 'Set up auto-pay' to try again.")},
+  try_another_bank:()=>toast("You can set up auto-pay from another account in your name (demo)."),
 };
 function toast(t){$("#toast").textContent=t}
 
@@ -385,13 +427,25 @@ const doc=(t,s,st,cls,ic=FILE)=>`<div class="doc"><div class="ic">${ic}</div><di
 function render(){
   const at=done?STEPS.length:STEPS.indexOf(step);
   $("#steps").innerHTML=STEPS.map((s,i)=>`<div class="${i<at?"done":i===at?"now":""}"><b>${i<at?"✓":i+1}</b>${LABEL[s]}</div>`).join("");
-  $("#stepno").textContent=done?"Completed":`Step ${at+1} of ${STEPS.length} · ${LABEL[step]}`;
+  $("#stepno").textContent=done?"Completed":`Step ${at+1} of ${STEPS.length} · ${TITLE[step]}`;
   const S=$("#screen");
   if(done){S.innerHTML=`<div class="success"><div class="tk">✓</div><h3>Great! Your application is submitted</h3><p class="muted">Journey ${jid} finished at ${clock}s.</p></div>`;return}
   if(step==="basic")S.innerHTML=`<h3>Basic details</h3><p class="muted">Pre-filled with sample data. Check and continue.</p>
   <div class="kv"><span>Full name</span><b>Samina P.</b><span>PAN</span><b>XXXXX1234X</b><span>Monthly income</span><b>₹45,000</b><span>Employment</span><b>Salaried</b></div>
   <button class="primary" id="next">Continue</button>`;
-  if(step==="kyc")S.innerHTML=`<h3>Upload documents</h3><p class="muted">We need these to verify your identity.</p>
+  if(step==="pan")S.innerHTML=`<h3>PAN details</h3><p class="muted">Your PAN confirms your identity for credit checks. It's checked as you type.</p>
+  <div class="form"><label>PAN number<input id="panIn" value="ABCDE1234F" maxlength="10" autocomplete="off"><span class="fchk" id="panChk"></span></label>
+  <label>Name on PAN<input id="panName" value="${esc(panName)}"><span class="fchk"></span></label></div>
+  <div class="row"><button class="primary" id="panGo">Verify PAN</button></div>
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · things that go wrong with PAN</div>
+  <div class="row"><button data-act="panWrong">PAN typed wrong</button><button data-fail="PAN_NOT_LINKED">PAN not linked to Aadhaar</button></div></div>`;
+  if(step==="kyc")S.innerHTML=`<h3>Aadhaar e-KYC</h3><p class="muted">Verify with an OTP sent to the mobile linked to your Aadhaar, or upload a photo of your Aadhaar card below.</p>
+  <div class="form"><label>Aadhaar number<input id="aadIn" placeholder="12 digits" inputmode="numeric" maxlength="14" autocomplete="off" value="${aadhaarLast4?"XXXX XXXX "+aadhaarLast4:""}" ${aadhaarLast4?"readonly":""}><span class="fchk ${aadhaarLast4?"ok":""}" id="aadChk">${aadhaarLast4?"✓ Valid Aadhaar number · only the last 4 digits are kept":""}</span></label>
+  <label>Name on Aadhaar<input id="aadName" value="${esc(aadName)}"><span class="fchk" id="aadNameChk"></span></label></div>
+  <div class="row"><button class="primary" id="otpSend">Send OTP</button><button data-act="sampleAadhaar">Use a sample number (demo)</button></div>
+  <div id="otpBox" hidden><div class="form"><label>OTP<input id="otpIn" placeholder="6 digits" inputmode="numeric" maxlength="6"><span class="fchk" id="otpMsg"></span></label></div>
+  <div class="row"><button class="primary" id="otpGo">Verify OTP</button></div></div>
+  <div class="alt"><div class="h">Or upload a photo of your Aadhaar card</div>
   <div class="docs">
   <div class="doc now"><div class="ic">${ICON}</div><div class="t"><b>Identity proof</b><span>Aadhaar card, front side</span></div><span class="st need">Action needed</span>
    <div class="upl">${guideOn?`<div class="frame">Keep all four corners inside the frame</div>`:""}
@@ -400,20 +454,34 @@ function render(){
     <div class="row">${SAMPLES.map(([k,l])=>`<button data-sample="${k}" class="${pick&&pick.kind===k?"on":""}">${l}</button>`).join("")}</div></div>
    <div id="preview"></div>
    <div class="muted" id="doc"></div></div></div>
-  ${doc("PAN card","From basic details","Verified","ok")}
-  ${doc("Income proof","Salary slip","Uploaded","ok")}
-  ${doc("Bank statement","Last 3 months","Next","wait")}
-  </div>
-  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · other things that go wrong at KYC</div>
-  <div class="row"><button id="live">Face check fails</button><button id="dl">No DigiLocker</button></div></div>`;
+  </div></div>
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · things that go wrong with Aadhaar e-KYC</div>
+  <div class="row"><button data-fail="OTP_NOT_RECEIVED">OTP not received</button><button data-fail="MOBILE_NOT_LINKED">Mobile not linked to Aadhaar</button><button data-act="nameWrong">Name doesn't match PAN</button><button id="dl">No DigiLocker</button></div></div>`;
+  if(step==="selfie")S.innerHTML=`<h3>Take a selfie</h3><p class="muted">We match your face to the photo on your ID, so no one else can apply in your name.</p>
+  <div class="selfie">Your face<br>goes here</div>
+  <div class="row"><button class="primary" id="selfieGo">Take selfie (simulated)</button></div>
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · things that go wrong with the selfie</div>
+  <div class="row"><button data-fail="FACE_MISMATCH">Selfie doesn't match the ID</button><button id="live">Face check fails</button></div></div>`;
   if(step==="offer")S.innerHTML=`<h3>Your loan offer</h3><p class="muted">Sample numbers for the demo.</p>
   <div class="offercard"><div class="amt">Loan amount</div><strong>₹50,000</strong><div class="g"><div><span>Tenure</span><b>12 months</b></div><div><span>EMI</span><b>₹4,600</b></div><div><span>APR</span><b>21.6%</b></div></div></div>
   <div class="row"><button id="kfs">Open Key Fact Statement</button><button id="back">Go back</button><button class="primary" id="accept">Accept offer</button></div>`;
-  if(step==="bank")S.innerHTML=`<h3>Bank account</h3><p class="muted">Disbursal goes straight to your own account.</p>
-  <div class="docs">${doc("Savings account","XXXX XXXX 4821 · sample","Verified","ok")}</div><div class="row"><button class="primary" id="next">Continue</button></div>`;
+  if(step==="bank")S.innerHTML=`<h3>Bank account</h3><p class="muted">The loan is paid into this account, so it must be in your own name. We check it by sending ₹1.</p>
+  <div class="form"><label>Account number<input id="acct" value="50100123454821" inputmode="numeric"><span class="fchk"></span></label>
+  <label>IFSC<input id="ifscIn" value="HDFC0001234" maxlength="11" autocomplete="off"><span class="fchk" id="ifscChk"></span></label>
+  <label>Account holder name<input id="holder" value="${esc(aadName)}"><span class="fchk" id="holderChk"></span></label></div>
+  <div class="row"><button class="primary" id="bankGo">Verify account</button></div><div class="okmsg" id="bankMsg"></div>
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · things that go wrong with the bank account</div>
+  <div class="row"><button data-act="ifscWrong">Wrong IFSC</button><button data-act="holderWrong">Account in another name</button><button data-fail="PENNY_DROP_FAILED">₹1 check failed</button></div></div>`;
+  if(step==="mandate")S.innerHTML=`<h3>Set up auto-pay</h3><p class="muted">Auto-pay takes your EMI on the due date each month, so you never miss one. It stops when the loan is repaid.</p>
+  <div class="methods" id="methods"></div>
+  <div class="row"><button class="primary" id="mandateGo">Set up auto-pay (simulated)</button></div><div class="okmsg" id="mandateMsg"></div>
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · things that go wrong with auto-pay</div>
+  <div class="row"><button data-fail="MANDATE_BANK_UNSUPPORTED">Bank doesn't support auto-pay</button><button data-fail="MANDATE_OTP_TIMEOUT">Auto-pay OTP timed out</button><button data-fail="NO_DEBIT_CARD">No debit card</button></div></div>`;
   if(step==="review")S.innerHTML=`<h3>Review and submit</h3><p class="muted">Everything is in place.</p>
-  <div class="kv"><span>Loan amount</span><b>₹50,000</b><span>EMI</span><b>₹4,600 × 12 months</b><span>Documents</span><b>All verified</b></div>
+  <div class="kv"><span>Loan amount</span><b>₹50,000</b><span>EMI</span><b>₹4,600 × 12 months</b><span>PAN</span><b>Verified</b><span>Aadhaar</span><b>${aadhaarLast4?"XXXX XXXX "+aadhaarLast4:"Verified"}</b><span>Selfie</span><b>Matched</b><span>Bank account</span><b>Confirmed with ₹1</b><span>Auto-pay</span><b>Set up</b></div>
   <button class="primary" id="submit">Submit application</button>`;
+  if(step==="mandate")drawMethods();
+  renderChecklist();
   bind();
 }
 function bind(){
@@ -423,13 +491,90 @@ function bind(){
   on("dl",()=>send("digilocker_error","NOT_REGISTERED"));
   on("kfs",()=>send("kfs_open"));
   on("back",()=>send("back"));
-  on("accept",async()=>{hide();await go("bank")});
+  on("accept",async()=>{hide();await go("review")});
+  on("panGo",verifyPan);on("otpSend",sendOtp);on("otpGo",verifyOtp);on("selfieGo",()=>pass("bank"));
+  on("bankGo",verifyBank);on("mandateGo",async()=>{$("#mandateMsg").textContent=`✓ Auto-pay set up with ${METHODS[method]} (simulated)`;await pass("offer",900)});
+  document.querySelectorAll("[data-fail]").forEach(b=>b.onclick=()=>send("check_failed",b.dataset.fail));
+  document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>ACTS[b.dataset.act]());
+  live("#panIn","#panChk","pan");live("#ifscIn","#ifscChk","ifsc");liveAadhaar();
   on("submit",async()=>{await send("submit");done=true;hide();render()});
   document.querySelectorAll("[data-sample]").forEach(b=>b.onclick=()=>choose(b.dataset.sample));
   const f=document.getElementById("file");
   if(f)f.onchange=()=>{if(f.files[0])choose(null,f.files[0]);f.value=""};
   drawPreview();
 }
+
+// ---- Document steps: offline format checks (server, nothing stored), then a pass or a failure event.
+let panName="SAMINA PARVEEN",aadName="Samina Parveen",aadhaarLast4=null,method="netbanking",applicant="salaried";
+const METHODS={netbanking:"Net banking",debit:"Debit card",upi:"UPI AutoPay"};
+const HINT={PAN_FORMAT:"Should be 5 letters, 4 numbers, then 1 letter (like ABCDE1234F).",
+  AADHAAR_FORMAT:"That isn't a valid Aadhaar number (12 digits, and the last one is a check digit).",
+  IFSC_FORMAT:"Should be 11 characters: 4 letters, 0, then 6 letters or numbers (like HDFC0001234)."};
+const post=(path,body)=>api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+const idc=(kind,value)=>post("/idcheck",{kind,value});
+const nameCheck=bank=>post("/idcheck/names",{pan_name:panName,aadhaar_name:aadName,bank_name:bank??null});
+function mark(id,r,okText){const el=$(id);if(!el)return;el.className="fchk "+(r.ok?"ok":"bad");el.textContent=r.ok?"✓ "+(okText||"Looks right"):"✗ "+(HINT[r.code]||r.code)}
+function live(inputId,chkId,kind){const el=$(inputId);if(!el)return;let t;
+  el.oninput=()=>{clearTimeout(t);t=setTimeout(async()=>{if(!el.value.trim()){$(chkId).textContent="";return}mark(chkId,await idc(kind,el.value))},250)}}
+function liveAadhaar(){const el=$("#aadIn");if(!el||el.readOnly)return;let t;
+  el.oninput=()=>{clearTimeout(t);t=setTimeout(async()=>{const n=el.value.replace(/\D/g,"").length,c=$("#aadChk");
+    if(n<12){c.className="fchk";c.textContent=n?`${n} of 12 digits`:"";return}
+    const r=await idc("aadhaar",el.value);if(r.ok)maskAadhaar(r);else mark("#aadChk",r)},250)}}
+function maskAadhaar(r){const el=$("#aadIn");el.value=r.display;el.readOnly=true;aadhaarLast4=r.last4;
+  $("#aadChk").className="fchk ok";$("#aadChk").textContent="✓ Valid Aadhaar number · only the last 4 digits are kept"}
+async function pass(next,wait=0){await send("check_ok");hide();if(wait)await new Promise(r=>setTimeout(r,wait));await go(next)}
+async function verifyPan(){panName=$("#panName").value;const r=await idc("pan",$("#panIn").value);mark("#panChk",r,"Valid PAN format");
+  if(!r.ok)return send("check_failed","PAN_FORMAT");await pass("kyc",500)}
+async function sendOtp(){aadName=$("#aadName").value;
+  if(!aadhaarLast4){const r=await idc("aadhaar",$("#aadIn").value);mark("#aadChk",r);if(!r.ok)return send("check_failed","AADHAAR_FORMAT");maskAadhaar(r)}
+  const n=await nameCheck();const c=$("#aadNameChk");
+  if(!n.ok){c.className="fchk bad";c.textContent=`✗ Doesn't match the name on your PAN (${panName})`;return send("check_failed","NAME_MISMATCH")}
+  c.className="fchk ok";c.textContent="✓ Matches your PAN";$("#otpBox").hidden=false;
+  $("#otpMsg").textContent=`OTP sent to the mobile linked to Aadhaar XXXX XXXX ${aadhaarLast4}. Demo: any 6 digits work.`}
+async function verifyOtp(){if(!/^\d{6}$/.test($("#otpIn").value)){$("#otpMsg").textContent="Enter the 6-digit OTP.";return}await pass("selfie")}
+async function verifyBank(){const r=await idc("ifsc",$("#ifscIn").value);mark("#ifscChk",r,"Valid IFSC format");
+  if(!r.ok)return send("check_failed","IFSC_FORMAT");
+  const n=await nameCheck($("#holder").value),c=$("#holderChk");
+  if(!n.ok){c.className="fchk bad";c.textContent=`✗ Doesn't match the name on your PAN (${panName})`;return send("check_failed","ACCOUNT_NAME_MISMATCH")}
+  c.className="fchk ok";c.textContent="✓ Matches your PAN";$("#bankMsg").textContent="✓ ₹1 sent to the account and received (simulated)";await pass("mandate",900)}
+// Verhoeff check digit, only to make a synthetic demo number; it is shown masked and never kept.
+const VD=[[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+const VP=[[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+const VINV=[0,4,3,2,1,5,6,7,8,9];
+function checkDigit(n){let c=0;[...n].reverse().forEach((d,i)=>{c=VD[c][VP[(i+1)%8][+d]]});return VINV[c]}
+const ACTS={
+  panWrong:()=>{$("#panIn").value="ABCD1234F";verifyPan()},
+  sampleAadhaar:async()=>{const b="9999"+String(Math.floor(1e6+Math.random()*9e6));const r=await idc("aadhaar",b+checkDigit(b));if(r.ok)maskAadhaar(r)},
+  nameWrong:()=>{$("#aadName").value="Suresh Patel";if(!aadhaarLast4)ACTS.sampleAadhaar().then(sendOtp);else sendOtp()},
+  ifscWrong:()=>{$("#ifscIn").value="SBIN1234567";verifyBank()},
+  holderWrong:()=>{$("#ifscIn").value="HDFC0001234";$("#holder").value="Ankit Rao";verifyBank()},
+};
+function drawMethods(){const M=$("#methods");if(!M)return;
+  M.innerHTML=Object.entries(METHODS).map(([k,l])=>`<button data-m="${k}" class="${k===method?"on":""}">${l}</button>`).join("");
+  M.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{method=b.dataset.m;drawMethods()})}
+
+// ---- Documents checklist (which documents this applicant needs, and where each one is)
+const DOCS={pan:["PAN card","Confirms your identity for credit checks.","pan"],
+  aadhaar:["Aadhaar","Proves who you are and where you live (e-KYC).","kyc"],
+  salary:["Salary slips · last 3 months","Shows your monthly income.",null],
+  stmt3:["Bank statement · last 3 months (if asked)","Shows your salary coming in.",null],
+  stmt6:["Bank statement · last 6 months (or ITR for 2 years)","Shows your business income.",null],
+  selfie:["Selfie","Matches your face to your ID, so no one else can apply in your name.","selfie"],
+  bank:["Bank account","Where the loan is paid. It must be in your name.","bank"],
+  mandate:["Auto-pay setup","Pays your EMI on the due date, so you never miss one.","mandate"]};
+const NEED={preapproved:["pan","aadhaar"],salaried:["pan","aadhaar","salary","stmt3"],selfemployed:["pan","aadhaar","stmt6"]};
+function docStatus(s){
+  if(s&&(done||STEPS.indexOf(step)>STEPS.indexOf(s)))return["Done","ok"];
+  if(s&&open&&last&&last.detection.step===s)return["Needs attention","need"];
+  return["Not started","wait"]}
+function renderChecklist(){const C=$("#checklist");if(!C)return;
+  const items=[...NEED[applicant],"selfie","bank","mandate"];
+  C.innerHTML=`<div class="ckhead"><h3>Documents you'll need</h3><label>I am <select id="who">
+    <option value="preapproved">Pre-approved</option><option value="salaried">Salaried</option><option value="selfemployed">Self-employed</option></select></label></div>
+   <div class="cklist">${items.map(k=>{const[t,why,st]=DOCS[k];const[label,cls]=docStatus(st);
+     return`<div class="ck"><div><b>${t}</b><span class="why">${why}</span></div><span class="st ${cls}">${label}</span></div>`}).join("")}</div>
+   <div class="cknote">Based on Paytm's public loan pages. Exact documents depend on the lender.</div>`;
+  $("#who").value=applicant;$("#who").onchange=e=>{applicant=e.target.value;renderChecklist()}}
 
 // Upload step: pick a file, see it, then submit. The server's photo check (OpenCV) decides pass or fail.
 const SAMPLES=[["good","✓ Good photo"],["cropped","Corner cut off"],["blurry","Blurry"],["glare","Glare"],["wrong_file","Wrong file (Word)"]];
@@ -478,15 +623,17 @@ async function submitDoc(){
   pick.result=r;drawPreview();
   $("#doc").textContent=tech?`Doc check: ${r.ok?"ok":r.issues.join(", ")} · card ${r.card?r.card.status:"off"} · sharpness ${r.metrics.sharpness??"-"} · glare ${r.metrics.glare_ratio??"-"}`
     :r.ok?"Identity proof accepted. Moving to your loan offer…":`Didn't pass, because ${r.issues.map(i=>PHOTO[i]||i).join(" and ")}. Try another photo.`;
-  if(r.ok){await new Promise(s=>setTimeout(s,2000));await send("upload_ok");hide();URL.revokeObjectURL(pick.url);pick=null;guideOn=false;await go("offer")}
+  if(r.ok){await new Promise(s=>setTimeout(s,2000));await send("upload_ok");hide();URL.revokeObjectURL(pick.url);pick=null;guideOn=false;await go("selfie")}
   else await send("upload_failed",r.issues[0]);
 }
 
 async function loadAudit(){const rows=(await api("/audit?limit=200")).filter(r=>r.journey_id===jid).slice(0,8);$("#audit").innerHTML=tech?"<tr><th>Journey</th><th>Blocker</th><th>Action</th><th>Lang</th><th>Policy</th></tr>"+rows.map(r=>`<tr><td>${r.journey_id}</td><td>${r.blocker}</td><td>${r.action}${r.escalated?" ⇢ person":""}</td><td>${r.lang}</td><td>${r.policy_ok?"ok":"blocked"}</td></tr>`).join("")
   :"<tr><th>Problem</th><th>Pakka's help</th><th>Language</th><th>Allowed?</th></tr>"+rows.map(r=>`<tr><td>${PROBLEM[r.blocker]||r.blocker}</td><td>${FIX[r.action]||r.action}${r.escalated?" ⇢ person":""}</td><td>${LANGS[r.lang]||r.lang}</td><td>${r.policy_ok?"Yes":"No, so a person took over"}</td></tr>`).join("")}
-async function loadEval(){try{const e=await api("/eval");const s=e.scripted_scenarios,p=e.policy,d=e.detection,l=e.latency;
+async function loadEval(tries=3){try{const e=await api("/eval");let docs=null;try{docs=await api("/eval/docs")}catch(_){}const s=e.scripted_scenarios,p=e.policy,d=e.detection,l=e.latency;
   $("#eval").innerHTML=tech?`<table><tr><td>Synthetic journeys</td><td>${e.dataset.journeys}</td></tr><tr><td>Blocker detection accuracy</td><td>${d.accuracy}</td></tr><tr><td>Actions checked / policy violations</td><td>${p.actions_checked} / ${p.violations}</td></tr><tr><td>Scripted scenarios passed</td><td>${s.passed} / ${s.scenarios}</td></tr><tr><td>Agent latency p50 / p95</td><td>${l.p50_ms} / ${l.p95_ms} ms</td></tr></table><p class="muted">Synthetic data uses the same failure taxonomy as the detector, so this checks the logic, not real-world accuracy.</p>`
-  :`<table><tr><td>Practice applications run</td><td>${e.dataset.journeys}</td></tr><tr><td>Fixes checked against the allowed list</td><td>${p.actions_checked}, with ${p.violations} rule breaks</td></tr><tr><td>Hand-written test cases passed</td><td>${s.passed} of ${s.scenarios}</td></tr><tr><td>Time for Pakka to decide</td><td>about ${Math.round(l.p50_ms)} ms</td></tr><tr><td>On 260 new cases it never saw</td><td>right 85% of the time, with no false alarms</td></tr></table><p class="muted">The practice applications use the same problems the rules look for, so they check the logic, not real-world accuracy. Real accuracy needs a pilot.</p>`}catch(e){}}
+  :`<table><tr><td>Practice applications run</td><td>${e.dataset.journeys}</td></tr><tr><td>Fixes checked against the allowed list</td><td>${p.actions_checked}, with ${p.violations} rule breaks</td></tr><tr><td>Hand-written test cases passed</td><td>${s.passed} of ${s.scenarios}</td></tr><tr><td>Time for Pakka to decide</td><td>about ${Math.round(l.p50_ms)} ms</td></tr><tr><td>On 260 new cases it never saw</td><td>right 85% of the time, with no false alarms</td></tr></table><p class="muted">The practice applications use the same problems the rules look for, so they check the logic, not real-world accuracy. Real accuracy needs a pilot.</p>`;
+  if(docs)$("#eval").innerHTML+=`<p class="muted" style="margin-top:8px"><b style="color:var(--ink)">New document steps</b> (PAN, Aadhaar OTP, selfie, bank, auto-pay): ${docs.passed} of ${docs.scenarios} hand-written cases pass. Reported separately from the numbers above.</p>`}
+  catch(e){if(tries>1)return setTimeout(()=>loadEval(tries-1),3000);$("#eval").textContent="Test results couldn't be loaded right now. Try refreshing the page."}}
 
 $("#yes").onclick=()=>{const a=last?.action;(EFFECT[a]||(()=>toast("Done.")))();if(a!=="guided_recapture")hide()};
 $("#no").onclick=hide;
@@ -550,7 +697,9 @@ document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dat
     if(r.top<70||r.bottom>innerHeight-170)scrollBy({top:r.top-110,behavior:"smooth"});
   }
   const STEPS=[
-    ["Samina is applying for a personal loan. Her details are already filled in.","#screen",()=>click("#next")],
+    ["Samina is applying for a personal loan. The checklist shows the documents a salaried applicant needs.","#checklist",null],
+    ["Her details are filled in. Next, her PAN is checked as she types it.","#screen",()=>click("#next")],
+    ["Her PAN is the right format, so she moves on to Aadhaar e-KYC.","#screen",async()=>{click("#panGo");await sleep(900)}],
     ["At KYC she chooses a photo of her ID card. The app shows a preview first, so she sees exactly what will be sent.","#preview",()=>click("[data-sample=cropped]")],
     ["She submits it. The server checks the photo and reads the card, and finds a corner of the card cut off.","#preview",async()=>{await sleep(300);click("#sendDoc");await idle()}],
     ["She sends the same photo again, and it fails again. She hasn't asked for help, but Pakka notices she's stuck.","#pakka",async()=>{click("#sendDoc");await idle()}],
@@ -560,10 +709,13 @@ document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dat
     ["Her next photo is blurry. Rather than loop, Pakka hands her to a person who can see everything so far.","#preview",async()=>{click("[data-sample=blurry]");await sleep(600);click("#sendDoc");await idle()}],
     ["Every step Pakka takes is written down.","#audit",null],
     ["She retakes it properly: the whole card, sharp, no glare. The card is read, the number is found, and it passes.","#preview",async()=>{click("[data-lang=en]");await sleep(300);click("[data-sample=good]");await sleep(900);click("#sendDoc");await idle()}],
+    ["She takes a selfie, which is matched to her ID, and confirms her bank account with a ₹1 check.","#screen",async()=>{click("#selfieGo");await sleep(900);click("#bankGo");await sleep(1600)}],
+    ["Auto-pay fails: her bank doesn't support this method. Pakka explains, in plain words.","#pakka",async()=>{click("[data-fail=MANDATE_BANK_UNSUPPORTED]");await sleep(600)}],
+    ["She switches to UPI AutoPay, and auto-pay is set up.","#screen",async()=>{click("[data-m=upi]");await sleep(400);click("#mandateGo");await sleep(1200)}],
     ["She reaches her loan offer.","#screen",null],
     ["She opens the Key Fact Statement and hesitates for two minutes.","#kfs",()=>{click("#kfs");setTimeout(()=>click("[data-tick='120']"),400)}],
     ["Pakka explains APR, EMI, fees, the cooling-off period and foreclosure in plain words.","#pakka",null],
-    ["She accepts, confirms her bank account and submits.","#screen",async()=>{click("#accept");await sleep(700);click("#next");await sleep(700);click("#submit")}],
+    ["She accepts, reviews everything and submits.","#screen",async()=>{click("#accept");await sleep(900);click("#submit")}],
   ];
   async function run(){
     cap.classList.add("on");

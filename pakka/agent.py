@@ -4,7 +4,7 @@ from typing import Optional, TypedDict
 from langgraph.graph import END, StateGraph
 
 from . import policy
-from .detector import detect
+from .docs_detector import detect_all
 from .explain import explain
 from .models import Detection, Event, Rescue
 
@@ -22,18 +22,22 @@ class State(TypedDict, total=False):
 
 
 def _detect(state: State) -> State:
-    return {"detection": detect(state["events"], state["now"])}
+    # Existing rules first (unchanged), then the document-step rules.
+    return {"detection": detect_all(state["events"], state["now"])}
 
 
 def _decide(state: State) -> State:
     d = state["detection"]
-    action = policy.choose(d.blocker, state.get("attempts", 0))
+    # Same as policy.choose() for every blocker without a per-cause ladder.
+    action = policy.choose_for(d.blocker, d.code, state.get("attempts", 0))
     return {"action": action, "escalated": action == "human_handoff"}
 
 
 def _guard(state: State) -> State:
     try:
         policy.check(state["detection"].blocker, state["action"])
+        if policy.decides_loan(state["action"]):
+            raise policy.PolicyViolation("Pakka never approves, rejects or changes a loan")
         return {"policy_ok": True}
     except policy.PolicyViolation:
         return {"policy_ok": False, "action": "human_handoff", "escalated": True}

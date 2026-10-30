@@ -90,10 +90,17 @@ TEMPLATES = {
 
 GENERIC_REASON = {"en": "the photo couldn't be read", "hi": "फ़ोटो पढ़ी न जा सकने"}
 
+# Loan document steps (PAN, Aadhaar OTP, selfie, bank, auto-pay): new messages live in docs_templates.
+from .docs_templates import CODE_TEMPLATES, STEP_NAMES as _DOC_STEPS, TEMPLATES as _DOC_TEMPLATES  # noqa: E402
+
+TEMPLATES.update(_DOC_TEMPLATES)
+for _lang, _names in _DOC_STEPS.items():
+    STEP_NAMES[_lang].update(_names)
+
 
 def explain(action: str, lang: str = "en", step: str | None = None, code: str | None = None) -> str:
     lang = lang if lang in ("en", "hi") else "en"
-    text = TEMPLATES[action][lang]
+    text = CODE_TEMPLATES.get((action, code), TEMPLATES[action])[lang]
     reason = PHOTO_REASONS[lang].get(code or "", GENERIC_REASON[lang])
     text = text.format(reason=reason, step=STEP_NAMES[lang].get(step or "", step or ""))
     if action == "explain_kfs":

@@ -2,7 +2,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-Step = Literal["basic", "kyc", "offer", "bank", "review"]
+# "kyc" is the Aadhaar e-KYC step; "pan", "selfie" and "mandate" (auto-pay) were added for the
+# document steps. Existing step names are unchanged.
+Step = Literal["basic", "pan", "kyc", "selfie", "bank", "mandate", "offer", "review"]
 
 EventType = Literal[
     "step_view",
@@ -14,6 +16,9 @@ EventType = Literal[
     "back",
     "session_expired",
     "submit",
+    # document steps: a format/verification check failed or passed (the code says which)
+    "check_failed",
+    "check_ok",
 ]
 
 

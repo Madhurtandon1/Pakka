@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements-ocr.txt \
  && pip install --no-cache-dir --no-deps "rapidocr_onnxruntime>=1.2.3,<1.5"
 COPY . .
-RUN python eval/run_eval.py && python eval/merchant_eval.py
+RUN python eval/run_eval.py && python eval/merchant_eval.py && python eval/docs_scenarios.py
 
 # Render (and most hosts) pass the public port in $PORT; locally it falls back to 8000.
 EXPOSE 8000

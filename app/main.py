@@ -12,6 +12,7 @@ from app.merchant_api import router as merchant_router
 from pakka import aadhaar, sarvam
 from pakka.agent import rescue
 from pakka.doccheck import check_image
+from pakka.docs_detector import NEW_BLOCKERS
 from pakka.explain import kfs_term
 from pakka.models import Event
 from pakka.store import Store
@@ -74,9 +75,12 @@ def get_rescue(jid: str, now: float = Query(ge=0), lang: str = "en", dry: bool =
     probe = rescue(jid, events, now, lang=lang)
     if dry or not probe.detection.stalled:
         return probe
-    attempts = store.attempts(jid, probe.detection.blocker)
+    d = probe.detection
+    # Document-step blockers count attempts per cause (a PAN typo and a name mismatch are different
+    # problems, each explained once); the original blockers count per blocker, as before.
+    attempts = store.attempts(jid, d.blocker, d.code if d.blocker in NEW_BLOCKERS else None)
     out = rescue(jid, events, now, attempts=attempts, lang=lang)
-    store.log(jid, out.detection.blocker, out.action, lang, out.message, out.policy_ok, out.escalated)
+    store.log(jid, out.detection.blocker, out.action, lang, out.message, out.policy_ok, out.escalated, d.code)
     return out
 
 
@@ -94,6 +98,33 @@ async def doccheck(file: UploadFile = File(...)):
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(413, "file too large")
     return check_image(data)
+
+
+class IdIn(BaseModel):
+    kind: str          # "pan", "aadhaar" or "ifsc"
+    value: str
+
+
+class NamesIn(BaseModel):
+    pan_name: str
+    aadhaar_name: str
+    bank_name: str | None = None
+
+
+@app.post("/idcheck")
+def id_check(body: IdIn):
+    """Offline format check. Nothing is stored; an Aadhaar number comes back only as XXXX XXXX 1234."""
+    from pakka import idcheck
+    checks = {"pan": idcheck.check_pan, "aadhaar": idcheck.check_aadhaar, "ifsc": idcheck.check_ifsc}
+    if body.kind not in checks:
+        raise HTTPException(404, "unknown check")
+    return checks[body.kind](body.value)
+
+
+@app.post("/idcheck/names")
+def names_check(body: NamesIn):
+    from pakka import idcheck
+    return idcheck.check_names(body.pan_name, body.aadhaar_name, body.bank_name)
 
 
 @app.get("/samples/{kind}")
@@ -129,6 +160,15 @@ def speak(body: SpeakIn):
 @app.get("/audit")
 def audit(limit: int = 50):
     return store.audit(limit)
+
+
+@app.get("/eval/docs")
+def eval_docs():
+    """Document-step scenarios, reported separately from the main results."""
+    path = RESULTS.with_name("docs_results.json")
+    if not path.exists():
+        raise HTTPException(404, "run python eval/docs_scenarios.py first")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @app.get("/eval")
