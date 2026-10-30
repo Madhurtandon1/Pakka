@@ -1,0 +1,67 @@
+# nginx in front of the FastAPI app (one container).
+# nginx serves the three pages straight from disk; every other path is proxied to uvicorn.
+# start.sh replaces __PORT__ with the port the host assigns ($PORT on Render).
+worker_processes auto;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /dev/stdout;
+    sendfile on;
+    server_tokens off;
+    keepalive_timeout 65;
+
+    gzip on;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript application/json image/svg+xml text/plain;
+
+    # ID photo uploads go to /doccheck; the app itself rejects files over 8 MB.
+    client_max_body_size 9m;
+
+    # Applies to every response (no location below sets its own add_header).
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    upstream pakka_app {
+        server 127.0.0.1:9000;
+        keepalive 16;
+    }
+
+    server {
+        listen __PORT__;
+        root /app/app/static;
+
+        # Frontend: the pages are static HTML, so nginx serves them without touching Python.
+        location = / {
+            try_files /index.html =404;
+            expires -1;
+        }
+        location = /demo {
+            try_files /demo.html =404;
+            expires -1;
+        }
+        location = /merchant {
+            try_files /merchant.html =404;
+            expires -1;
+        }
+
+        # Backend: the API, sample documents, voice and health check.
+        location / {
+            proxy_pass http://pakka_app;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+            proxy_read_timeout 60s;
+        }
+    }
+}

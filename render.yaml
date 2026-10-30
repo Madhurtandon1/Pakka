@@ -1,6 +1,7 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
 # New > Blueprint > pick this repo. Render builds the Dockerfile (which also runs the evals,
-# so a broken safety rule fails the deploy) and serves the app on the port it assigns.
+# so a broken safety rule fails the deploy). Inside the container, nginx listens on the port
+# Render assigns, serves the pages, and proxies the API to FastAPI (see deploy/).
 services:
   - type: web
     name: pakka

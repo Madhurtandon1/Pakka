@@ -4,7 +4,7 @@ Pakka is one FastAPI app (`app/main.py`) that serves the landing page, both demo
 
 | | Render | Vercel |
 |---|---|---|
-| How it runs | Always-on Docker container | Serverless function |
+| How it runs | Docker container: nginx in front, FastAPI behind | Serverless function |
 | Config file | `render.yaml` + `Dockerfile` | `vercel.json` + `.vercelignore` + `.python-version` |
 | Demo state (journeys, merchant days) | Kept while the server runs | Kept per function instance; can reset when Vercel starts a new instance |
 | Safety evals | Run during every build; a broken rule fails the deploy | Not run (GitHub Actions still runs them on every push) |
@@ -14,6 +14,17 @@ Pakka is one FastAPI app (`app/main.py`) that serves the landing page, both demo
 ---
 
 ## Render (recommended for the live demo)
+
+On Render, the frontend and backend run together in one container, with **nginx** as the web server:
+
+```
+Internet ──▶ Render (HTTPS) ──▶ nginx :$PORT ──┬─ /, /demo, /merchant ─▶ HTML pages from app/static (gzip, no-cache)
+                                               └─ everything else ─────▶ FastAPI (uvicorn) on 127.0.0.1:9000
+```
+
+- `deploy/nginx.conf.template`: nginx config. Serves the three pages from disk, adds security headers, gzips responses, caps uploads at 9 MB and proxies the API.
+- `deploy/start.sh`: starts uvicorn, waits until it's ready, then starts nginx. If either stops, the container exits and Render restarts it.
+- One service keeps one address, so the pages' API calls (`/merchant/...`, `/doccheck`) need no CORS or URL changes.
 
 1. Sign in at https://dashboard.render.com with GitHub.
 2. Click **New → Blueprint** and pick the `Pakka` repository.
@@ -69,3 +80,5 @@ docker build -t pakka .
 docker run -p 8000:8000 pakka            # http://localhost:8000
 docker run -e PORT=10000 -p 10000:10000 pakka   # hosts that assign a port
 ```
+
+The image runs nginx on `$PORT` (default 8000) in front of FastAPI. To run FastAPI alone, without nginx (for local development), use `uvicorn app.main:app --reload`.
