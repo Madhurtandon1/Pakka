@@ -92,7 +92,8 @@ flowchart LR
 | Optional reply labelling | Sarvam `sarvam-105b`, Google Gemini, or Anthropic Claude Haiku. All optional; offline keywords by default |
 | Storage | SQLite (Postgres planned) |
 | Frontend | Plain HTML/CSS/JS: landing page, loan demo, merchant demo |
-| Quality | 154 pytest tests, 4 eval scripts, GitHub Actions CI, Docker |
+| Document checks | Offline PAN / Aadhaar (Verhoeff) / IFSC format checks, RapidOCR for Aadhaar photos (optional), `pypdf` for bank statements |
+| Quality | 274 pytest tests, 5 eval scripts, GitHub Actions CI, Docker |
 
 ### Repository map
 
@@ -110,7 +111,7 @@ eval/
   run_eval.py  holdout.py           Journey A evaluations
   merchant_eval.py                  Journey B guard evaluation (CI-gated)
   intent_holdout.py                 Blind test of the reply classifier
-tests/                              154 tests
+tests/                              274 tests
 Dockerfile  .dockerignore  .github/workflows/ci.yml
 ```
 
@@ -162,6 +163,23 @@ Dockerfile  .dockerignore  .github/workflows/ci.yml
 | Agent latency | ~1.1 ms p50 |
 
 **Known misses, left visible:** (1) a single failed face check followed by a long pause; (2) two failed uploads followed by a 10+ minute walk-away, which is labelled a timeout. The 1.00 on our own 500 synthetic journeys only shows the rules do what we wrote, so we don't headline it.
+
+---
+
+### Loan document steps (new)
+
+The demo now follows the document steps of a Paytm-style application: **details → PAN → Aadhaar e-KYC → selfie → bank account → auto-pay → loan offer → review**, with a documents checklist by applicant type (pre-approved, salaried, self-employed).
+
+| New blocker | Example | Pakka's help |
+|---|---|---|
+| `pan_problem` | PAN typed wrong twice; PAN not linked to Aadhaar; names don't match | Explains the exact rule ("5 letters, 4 numbers, then 1 letter"), gives the link guide, or passes a name mismatch to a person after one explanation |
+| `aadhaar_otp` | OTP not received; mobile not linked | OTP tips → DigiLocker → offline Aadhaar → person; video KYC when the mobile isn't linked |
+| `face_match` | Selfie doesn't match | Tips → guided retake → video KYC → person |
+| `bank_verify` | Wrong IFSC; account in another name; ₹1 check failed | Explains, re-enter, another account, person |
+| `mandate_failed` | Bank doesn't support auto-pay | Explains, suggests net banking, debit card or UPI AutoPay |
+| `income_doc` | Statement is password-protected, too old or too short | Explains exactly why, guides a re-upload, then a person |
+
+The new rules sit in a separate extension that runs after the unchanged originals, so **30/30, 0.85 and 0 violations stay exactly the same**. The new scenarios are reported separately: **25/25** (written alongside the rules). These are format and document checks, not NSDL, UIDAI or bank verification.
 
 ---
 
@@ -283,7 +301,7 @@ A teammate who had never seen the code wrote **50 replies in Devanagari** (blind
 
 | | |
 |---|---|
-| **Tests** | 154 pytest tests: detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
+| **Tests** | 274 pytest tests (145 loan journey, 129 merchants): detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
 | **CI** | GitHub Actions runs the tests, `run_eval.py`, `holdout.py` and `merchant_eval.py` on every push |
 | **Docker** | `docker build -t pakka .` runs the evals at build time; `.dockerignore` keeps secrets out of the image |
 | **Secrets** | Keys live only in `.env`, which is git-ignored and never printed. The git history has been scanned clean |
@@ -301,7 +319,8 @@ uvicorn app.main:app --reload          # http://localhost:8000
 Run the demo **offline** (no `PAKKA_LLM_PROVIDER`), so no network call can fail on stage.
 
 **Journey A (`/demo`):**
-1. Go to KYC, choose the **"Corner cut off"** sample: a **preview** shows the file before anything is sent. Press **Submit this document** twice: the real OpenCV check rejects it, and Pakka steps in unasked. Show the chips (blocker, action, reasons, "policy ok", latency). Finish with the **"✓ Good photo"** sample, which passes.
+0. Show the **documents checklist** (switch Salaried / Self-employed), then on the **PAN** step press **PAN typed wrong** twice: the live format check and Pakka's plain explanation. Fix it and verify.
+1. On **Aadhaar e-KYC**, scroll to the photo upload, choose the **"Corner cut off"** sample: a **preview** shows the file before anything is sent. Press **Submit this document** twice: the real OpenCV check rejects it, and Pakka steps in unasked. Show the chips (blocker, action, reasons, "policy ok", latency). Finish with the **"✓ Good photo"** sample, which passes.
 2. Switch to **हिंदी** and press listen.
 3. **"Yes, help me"** gives consent, and the framing guide appears.
 4. **Fail once more:** handoff to a person; show the audit log.
@@ -366,7 +385,8 @@ From news reports of the 26 Oct Q2 FY27 release and earlier releases. **Confirm 
 | Fail-safe reply classifier (offline) | ✅ Working (the demo default) |
 | Optional LLM labelling: Sarvam, Gemini, Anthropic | ✅ Working, blind-tested |
 | Landing page, both demos, both guided tours | ✅ Working; tours checked in a browser |
-| 154 tests, CI, Docker | ✅ Passing |
+| Loan document steps: PAN, Aadhaar OTP, selfie, bank, auto-pay, income PDFs | ✅ Working (25/25 separate scenarios) |
+| 274 tests, CI, Docker | ✅ Passing |
 | Second blind test set | 🔜 Next step |
 | Pilot with real data | 🔜 Next step |
 

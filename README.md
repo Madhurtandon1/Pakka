@@ -120,6 +120,10 @@ For real Bulbul voice, copy `.env.example` to `.env` and set `SARVAM_API_KEY`.
 | KFS terms explained, English and Hindi | 6 / 6 in both |
 | Agent latency, p50 / p95 (no network) | ~1.1 ms / ~1.8 ms |
 
+### Loan document steps (reported separately)
+
+`python eval/docs_scenarios.py` runs 25 hand-written scenarios for the document steps (PAN, Aadhaar OTP, selfie, bank account, auto-pay, income documents): **25 / 25**. They are reported on their own and are **not** part of the 30/30 or the 0.85 held-out score. Like the 30/30, they were written alongside the rules, so they check the logic, not real-world accuracy.
+
 ### Held-out test
 
 `python eval/holdout.py` builds 260 journeys from 13 patterns written after the detector, which it was never tuned on: a PAN upload that works followed by Aadhaar failures, failures right at the 90-second line, someone fixing the problem and moving on, a brief look at the KFS, and so on.
@@ -144,7 +148,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-154 tests. 25 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, and the full API flow. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
+274 tests. 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -153,10 +157,34 @@ pytest -q
 | POST | `/journeys` | Start a journey |
 | POST | `/journeys/{id}/events` | Send an app event (`step_view`, `upload_failed`, `kfs_open`, …) |
 | GET | `/journeys/{id}/rescue?now=&lang=` | Run the agent; logs the intervention. Add `dry=true` to check without logging |
-| POST | `/doccheck` | Check an uploaded ID photo |
+| POST | `/doccheck` | Check an uploaded ID photo: quality, then read the Aadhaar card (masked) |
+| POST | `/idcheck` | Offline PAN, Aadhaar or IFSC format check (`{"kind": "pan", "value": "..."}`) |
+| POST | `/idcheck/names` | Name match across PAN, Aadhaar and bank account |
+| POST | `/pdfcheck?months=3` | Check a bank statement or salary-slip PDF |
+| GET | `/samples/{kind}` | Synthetic sample ID photos and statements for the demo |
 | GET | `/kfs/{term}?lang=` | Plain-language KFS term |
 | POST | `/speak` | Sarvam text-to-speech (needs a key) |
-| GET | `/audit`, `/eval` | Audit log and evaluation results |
+| GET | `/audit`, `/eval`, `/eval/docs` | Audit log, evaluation results, document-step scenarios |
+
+## Loan document steps (Journey A)
+
+The loan demo walks through the document steps of a Paytm-style application: **details → PAN → Aadhaar e-KYC → selfie → bank account → auto-pay (e-mandate) → loan offer (KFS) → review**. Pakka can step in at each one, with the same design as before: rules detect → `policy.json` chooses (ordered, 3rd attempt → a person) → guard → reviewed EN+HI templates → consent where needed → audit log.
+
+- **Documents checklist:** pick pre-approved, salaried or self-employed to see the documents needed, each with a status and a one-line reason. Based on Paytm's public loan pages; exact documents depend on the lender.
+- **Offline format checks** (`pakka/idcheck.py`): PAN (`ABCDE1234F` shape), Aadhaar (12 digits, not starting with 0/1, Verhoeff check digit; only `XXXX XXXX 1234` is ever shown or kept), IFSC, and a lenient name match across PAN, Aadhaar and the bank account.
+- **Real Aadhaar photo check** (`pakka/aadhaar.py`, optional OCR): finds the number, validates its check digit and the front-side fields; blurs your own photo in the preview and replaces it with a masked copy after the check.
+- **Income documents** (`pakka/pdfcheck.py`, `pypdf`): bank statements and salary slips as PDFs: won't open, password-protected, no readable dates, older than 45 days, or fewer months than asked.
+
+| Blocker | Fires when | Pakka's help, in order |
+|---|---|---|
+| `pan_problem` | PAN typed wrong twice, PAN not linked to Aadhaar, or PAN/Aadhaar names differ | explain → PAN–Aadhaar link guide (not linked only) → person; a name mismatch is explained once, then a person |
+| `aadhaar_otp` | OTP not received twice, or mobile not linked to Aadhaar | OTP tips → DigiLocker → offline Aadhaar file → person; mobile not linked → video KYC → person |
+| `face_match` | Selfie doesn't match the ID twice | selfie tips → guided retake → video KYC → person |
+| `bank_verify` | Wrong IFSC twice, account in another name, or the ₹1 check failed | explain → re-enter details → another account → person |
+| `mandate_failed` | Bank doesn't support the method, auto-pay OTP timed out twice, or no debit card | explain → another method (net banking / debit card / UPI AutoPay) → another bank → person |
+| `income_doc` | A statement upload fails any of the checks above | explain → guided re-upload → person |
+
+The new rules live in `pakka/docs_detector.py` and run **after** the unchanged existing rules; the existing face-check rule is reused on the selfie step. The guard also refuses any action that would approve, reject or change a loan, and no template says "rejected". These are format and document checks, not NSDL, UIDAI or bank verification, which the lender runs. New Hindi strings are marked `# HI: needs native review`.
 
 ## What's next
 
