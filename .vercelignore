@@ -12,3 +12,4 @@ docs
 Dockerfile
 render.yaml
 deploy
+e2e_report

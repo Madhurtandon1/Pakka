@@ -5,3 +5,4 @@ __pycache__/
 venv/
 .env
 *.db
+e2e_report/*.png

@@ -106,8 +106,11 @@ def rupees(paise: int) -> str:
     return f"₹{s}" + (f".{p:02d}" if p else "")
 
 
-def fmt_date(d: date | datetime) -> str:
-    return f"{d.day} {d:%b}"
+HI_MONTHS = ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"]
+
+
+def fmt_date(d: date | datetime, lang: str = "en") -> str:
+    return f"{d.day} {HI_MONTHS[d.month - 1]}" if lang == "hi" else f"{d.day} {d:%b}"
 
 
 def render(template_id: str, lang: str, **values) -> str:

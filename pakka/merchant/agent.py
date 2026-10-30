@@ -176,9 +176,9 @@ def _render(s: State) -> State:
         by_lang[lang] = {
             "lender": lender.lender_name, "shortfall": rupees(today.shortfall_today_paise),
             "overdue": rupees(today.total_overdue_paise), "penal_note": lender.penal_charges_note[lang],
-            "oldest": fmt_date(today.oldest_unpaid_date) if today.oldest_unpaid_date else fmt_date(today.day),
+            "oldest": fmt_date(today.oldest_unpaid_date or today.day, lang),
             "amount": rupees(amount), "link": link,
-            "short_amount": rupees(today.shortfall_today_paise), "short_link": upi(today.shortfall_today_paise), "time": f"{when:%H:%M}", "date": fmt_date(when),
+            "short_amount": rupees(today.shortfall_today_paise), "short_link": upi(today.shortfall_today_paise), "time": f"{when:%H:%M}", "date": fmt_date(when, lang),
             "request": REQUEST_NAMES.get(action, {}).get(lang, ""), "officer": lender.grievance_officer,
             "window": days, "avg": rupees(avg), "edi": rupees(p.loan.edi_paise),
         }

@@ -48,7 +48,10 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 /* layout */
 .grid{max-width:1500px;margin:0 auto;padding:16px 22px 60px;display:grid;grid-template-columns:380px 260px 1fr;gap:18px;align-items:start}
 @media(max-width:1180px){.grid{grid-template-columns:380px 1fr}.ops{grid-column:1/-1}}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
+@media(max-width:760px){.grid{grid-template-columns:minmax(0,1fr);padding:12px 12px 60px}.grid>section{min-width:0}
+  .top .row{padding:10px 12px;gap:10px}.ctl{flex-wrap:wrap;max-width:100%;min-width:0}#persona{max-width:100%;min-width:0}
+  .ph-top small{white-space:normal}.screen{min-height:0}.phone{border-radius:28px}
+  .top{position:static}}
 .h{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);font-weight:600;margin:0 0 10px}
 /* phone */
 .phone{background:#0B1A33;border:1px solid var(--edge);border-radius:38px;padding:12px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
@@ -77,6 +80,12 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .reply button{border:0;border-radius:10px;background:var(--navy);color:#fff;padding:0 12px}
 .reply button.mic{background:#fff;color:var(--navy);border:1px solid var(--line)}
 .reply button.mic.on{background:var(--red);color:#fff}
+.micnote{font-size:11px;color:var(--muted);margin-top:-4px}
+.cvhelp{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.cvhelp small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.cvout{font-size:13px;margin-top:8px;background:var(--paper,#f4f7fb);border-radius:10px;padding:8px 10px}
+.cvout:empty{display:none}
+.card .listen{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:999px;padding:2px 9px;font-size:11.5px;cursor:pointer}
 .under{display:flex;justify-content:space-between;align-items:center;font-size:13px}
 .under button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:99px;padding:6px 12px}
 .under button:disabled{opacity:.45;cursor:not-allowed}
@@ -186,6 +195,7 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
         <div id="appView" style="display:none;flex-direction:column;gap:12px">
           <div id="card" class="card quiet"></div>
           <div class="reply"><input type="text" id="replyText"><button class="mic" id="mic" title="Speak">🎤</button><button id="send">➤</button></div>
+          <div class="micnote" id="micNote">Voice works in Chrome or Edge. Your browser converts speech to text.</div>
           <div class="under"><button id="offers"></button><a id="withdraw"></a></div>
           <div class="hours" id="hours"></div>
           <div class="hist" id="hist"></div>
@@ -256,7 +266,7 @@ const REQ={human_handoff:"Talk to a person",route_lower_deduction_request:"Small
 const REQSTATUS={pending_lender_decision:"Waiting for the lender's decision",pending_lender_contact:"The lender will contact them"};
 const plain=k=>tech?k:(PLAIN[k]||k);
 const guardText=b=>tech?b:(GUARD[b.split(/[ :]/)[0]]||b);
-const hh=h=>h===12?"12 pm":h<12?`${h} am`:`${h-12} pm`;
+const hh=h=>lang==="hi"?`${h<12?"सुबह":h<16?"दोपहर":"शाम"} ${h>12?h-12:h} बजे`:h===12?"12 pm":h<12?`${h} am`:`${h-12} pm`;  // HI: needs native review
 
 const T={
   en:{allow:"Allow",notnow:"Not now",withdraw:"Withdraw consent",offers:"View loan offers",offersNo:"Offers unavailable",
@@ -267,6 +277,13 @@ const T={
       t3:"Loan offers",t3s:"Show me offers from lenders when I have no dues",
       off:"Alerts are off. Pakka won't contact you.",turnOn:"Turn on alerts",
       hours:"Contact hours",hourss:"When Pakka may contact you. Never outside 08:00–19:00",hoursNow:"Pakka messages you only from",reader:"Replies understood by",
+      permReq:"Permission request",permOff:"Permission withdrawn",perm:"Permission",listen:"🔊 Listen",
+      micNote:"Voice works in Chrome or Edge. Your browser converts speech to text.",
+      micNo:"Voice isn't supported in this browser. Please type your reply.",
+      micDenied:"Microphone permission was denied. Allow the microphone in your browser, or type your reply.",
+      micErr:"Couldn't hear that. Try again, or type your reply.",micCheck:"Check the words, edit if needed, then tap ➤ to send.",
+      helpQ:"Need help? You can still write to us. This doesn't turn on alerts.",
+      helpNoted:"Noted. Alerts are off, so Pakka won't follow up on payments. Turn on alerts above if you'd like help.",
       opt:{pay_today:"Pay now",pay_later:"Pay tomorrow",lower_deduction:"Lower deduction",reschedule:"New date",callback:"Call me",already_paid:"I already paid"},
       say:{pay_today:"I'll pay now",pay_later:"I'll pay tomorrow",lower_deduction:"Please reduce the daily deduction",reschedule:"Please reschedule my payment date",callback:"Please call me",already_paid:"I already paid"}},
   hi:{allow:"अनुमति दें",notnow:"अभी नहीं",withdraw:"सहमति वापस लें",offers:"लोन ऑफ़र देखें",offersNo:"ऑफ़र अभी उपलब्ध नहीं",
@@ -277,6 +294,13 @@ const T={
       t3:"लोन ऑफ़र",t3s:"कोई बकाया न हो तब लोन देने वालों के ऑफ़र दिखाएँ",
       off:"अलर्ट बंद हैं। Pakka आपसे संपर्क नहीं करेगा।",turnOn:"अलर्ट चालू करें",
       hours:"संपर्क का समय",hourss:"Pakka कब संपर्क कर सकता है। कभी भी 08:00–19:00 के बाहर नहीं",hoursNow:"Pakka आपसे सिर्फ़ इस समय संपर्क करता है:",reader:"जवाब समझता है",
+      permReq:"अनुमति का अनुरोध",permOff:"अनुमति वापस ली गई",perm:"अनुमति",listen:"🔊 सुनें",  // HI: needs native review
+      micNote:"आवाज़ Chrome या Edge में काम करती है। आपका ब्राउज़र बोली को लिखाई में बदलता है।",  // HI: needs native review
+      micNo:"इस ब्राउज़र में आवाज़ से लिखना काम नहीं करता। कृपया जवाब टाइप करें।",  // HI: needs native review
+      micDenied:"माइक्रोफ़ोन की अनुमति नहीं मिली। ब्राउज़र में माइक्रोफ़ोन चालू करें, या जवाब टाइप करें।",  // HI: needs native review
+      micErr:"आवाज़ सुनाई नहीं दी। फिर से कोशिश करें, या जवाब टाइप करें।",micCheck:"शब्द जाँच लें, ज़रूरत हो तो बदलें, फिर ➤ दबाकर भेजें।",  // HI: needs native review
+      helpQ:"मदद चाहिए? आप फिर भी हमें लिख सकते हैं। इससे अलर्ट चालू नहीं होंगे।",  // HI: needs native review
+      helpNoted:"ध्यान दिया। अलर्ट बंद हैं, इसलिए Pakka भुगतान के बारे में आगे संपर्क नहीं करेगा। मदद चाहिए तो ऊपर अलर्ट चालू करें।",  // HI: needs native review
       opt:{pay_today:"अभी भरूँगा",pay_later:"कल भरूँगा",lower_deduction:"कम कटौती",reschedule:"नई तारीख",callback:"कॉल करें",already_paid:"मैंने भर दिया"},
       say:{pay_today:"Abhi pay karta hoon",pay_later:"Kal de dunga",lower_deduction:"Thoda kam kato",reschedule:"Date aage badhao",callback:"Call karo",already_paid:"Maine already pay kiya"}}
 };
@@ -309,7 +333,7 @@ const post=(path,body)=>api(path,{method:"POST",headers:{"Content-Type":"applica
 const rs=p=>"₹"+(p/100).toLocaleString("en-IN",{maximumFractionDigits:2});
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let tt;function toast(t,ms=4200){const el=$("#toast");el.innerHTML=t;el.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("on"),ms)}
-function dateOf(day){const d=new Date(2026,9,day);return d.toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
+function dateOf(day){const d=new Date(2026,9,day);return d.toLocaleDateString(lang==="hi"?"hi-IN":"en-IN",{day:"numeric",month:"short"})}
 function setDay(d){$("#day").value=d;$("#dayLbl").textContent=`Day ${d} · ${dateOf(d)}`}
 
 async function init(){
@@ -320,13 +344,13 @@ async function init(){
   await select(META.personas[1].merchant_id);
 }
 
-async function select(id){
+async function select(id){cvOut="";
   mid=id;$("#persona").value=id;last=null;offerBlocked=null;
   const p=P[id];
   const meta=await api("/merchant/personas");meta.personas.forEach(q=>P[q.merchant_id].day=q.day);
   setDay(P[id].day);
   $("#story").innerHTML=`<b>${esc(p.title)}</b><span>${esc(p.story)}</span><span class="tag">${esc(p.lender)}</span><span class="tag">${p.shortfall_mode==="carry_forward_fifo"?"Short days: the rest is taken from later sales":"Short days: part-payments are held until a full payment"}</span><span class="tag">Daily loan payment ${rs(p.edi_paise)}</span><span class="tag">Messages only ${hh(p.contact_window[0])}–${hh(p.contact_window[1])}</span>`;
-  $("#phName").textContent=p.display_name;$("#phLender").textContent=`Business app (demo) · loan from ${p.lender}`;
+  $("#phName").textContent=p.display_name;$("#phLender").textContent=lang==="hi"?`बिज़नेस ऐप (डेमो) · लोन: ${p.lender}`:`Business app (demo) · loan from ${p.lender}`;  // HI: needs native review
   $("#sbId").textContent=p.soundbox_id||"NO SOUNDBOX";
   $("#cue").textContent=p.soundbox_id?"Waiting…":"This merchant has no Soundbox. Alerts go to the app.";
   await refresh();
@@ -338,27 +362,40 @@ async function refresh(){
   await Promise.all([loadLedger(),loadAudit(),loadReqs(),loadDash()]);
 }
 
+// Without permission Pakka never contacts the owner, but the owner can always write in:
+// a reply about a hard time or a dispute still reaches a person (the server's G1 exception).
+let cvOut="",declined={};   // "Not now" is remembered per shop, so the request isn't shown again on every refresh
+function helpBox(t){return`<div class="cvhelp"><small>${t.helpQ}</small><div class="reply"><input type="text" id="cvText" placeholder="${t.placeholder}"><button id="cvSend">➤</button></div><div class="cvout" id="cvOut">${cvOut}</div></div>`}
+function bindHelp(){const b=$("#cvSend");if(!b)return;const go=async()=>{const text=$("#cvText").value.trim();if(!text)return;
+  const r=await post(`/merchant/${mid}/reply`,{text});const m=lang==="hi"?r.message_hi:r.message_en;
+  cvOut=esc(r.action==="human_handoff"&&m?m:T[lang].helpNoted);await refresh()};
+  b.onclick=go;$("#cvText").onkeydown=e=>{if(e.key==="Enter")go()}}
 function renderPhone(c){
   const p=P[mid],t=T[lang];
   $("#replyText").placeholder=t.placeholder;$("#withdraw").textContent=t.withdraw;
   if(!c.active){
     $("#appView").style.display="none";const v=$("#consentView");v.style.display="";
+    const offView=()=>{v.innerHTML=`<p class="muted">${t.off}</p><div class="cbtns"><button class="allow" id="again">${t.turnOn}</button></div>${helpBox(t)}`;
+      $("#again").onclick=()=>{declined[mid]=false;renderPhone(c)};bindHelp()};
+    if(declined[mid])return offView();
     const prev=c.consent&&c.consent.withdrawn_at;
-    v.innerHTML=`<div class="eb" style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600">${prev?"Permission withdrawn":"Permission request"}${tech?" · "+META.notice_version:""}</div>
+    v.innerHTML=`<div class="eb" style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600">${prev?t.permOff:t.permReq} · ${META.notice_version}</div>
       <h3>${t.title}</h3><ul>${notice(p).map(x=>`<li>${x}</li>`).join("")}</ul>
       ${[["ew",t.t1,t.t1s,1],["sb",t.t2,t.t2s,p.soundbox_id?1:0],["ro",t.t3,t.t3s,1]].map(([k,a,b,on])=>`<div class="tog"><div>${a}<small>${b}</small></div><label class="switch"><input type="checkbox" id="c_${k}" ${on?"checked":""} ${k==="sb"&&!p.soundbox_id?"disabled":""}><span></span></label></div>`).join("")}
       <div class="tog"><div>${t.hours}<small>${t.hourss}</small></div><div style="white-space:nowrap"><select id="c_from">${[8,9,10,11,12,13,14,15,16,17,18].map(h=>`<option ${h===8?"selected":""}>${h}</option>`).join("")}</select> – <select id="c_to">${[9,10,11,12,13,14,15,16,17,18,19].map(h=>`<option ${h===19?"selected":""}>${h}</option>`).join("")}</select></div></div>
-      <div class="cbtns"><button class="allow" id="allow">${t.allow}</button><button class="no" id="notnow">${t.notnow}</button></div>`;
-    $("#allow").onclick=grant;
-    $("#notnow").onclick=()=>{v.innerHTML=`<p class="muted">${t.off}</p><div class="cbtns"><button class="allow" id="again">${t.turnOn}</button></div>`;$("#again").onclick=()=>renderPhone(c)};
+      <div class="cbtns"><button class="allow" id="allow">${t.allow}</button><button class="no" id="notnow">${t.notnow}</button></div>${helpBox(t)}`;
+    $("#allow").onclick=grant;bindHelp();
+    $("#notnow").onclick=()=>{declined[mid]=true;offView()};
     return;
   }
   $("#consentView").style.display="none";$("#appView").style.display="flex";
   const w=(c.consent&&c.consent.contact_window)||P[mid].contact_window;
   const cl=META.classifier||{mode:"keywords"};
   const reader=tech?(cl.mode==="llm"?`${cl.provider} ${cl.model} + keyword fail-safe`:"offline keywords (fail-safe)")
+    :lang==="hi"?(cl.mode==="llm"?`${cl.provider} AI, सुरक्षा शब्द-सूची से दोबारा जाँचा गया`:"एक अंदरूनी शब्द-सूची (बिना इंटरनेट के)")  // HI: needs native review
     :(cl.mode==="llm"?`${cl.provider[0].toUpperCase()+cl.provider.slice(1)} AI, double-checked by a safety word list`:"a built-in word list (works offline)");
-  $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="hi"?"–":" to "}${hh(w[1])} · ${t.reader}: ${reader}`;
+  $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="hi"?"–":" to "}${hh(w[1])} · ${t.perm}: ${c.consent?.notice_version||META.notice_version} · ${t.reader}: ${reader}`;
+  $("#micNote").textContent=t.micNote;
   renderCard();
   const ob=$("#offers");ob.disabled=!!offerBlocked;ob.textContent=offerBlocked?`${t.offersNo}${tech?" ("+offerBlocked+")":""}`:t.offers;
 }
@@ -374,16 +411,17 @@ function renderCard(){
     ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",b]),[r.policy_ok?"ok":"bad",r.policy_ok?"policy ok":"policy corrected"],r.lender_request_id?["ok",r.lender_request_id]:null,["",`${r.latency_ms} ms`]]
     :[...(r.rule_ids||[]).map(x=>["",PLAIN[x]||x]),r.intent?["",`Understood: ${PLAIN[r.intent]||r.intent}`]:null,["",`Pakka: ${PLAIN[r.action]||r.action}`],
     ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",guardText(b)]),r.lender_request_id?["ok","Sent to the lender"]:null]).filter(Boolean);
-  el.innerHTML=`<div class="eb"><span>Pakka ✦</span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
+  el.innerHTML=`<div class="eb"><span>Pakka ✦ <button class="listen" id="listenCard">${t.listen}</button></span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
     ${r.options.length?`<div class="opts">${r.options.map(o=>`<button data-opt="${o}">${t.opt[o]}</button>`).join("")}</div>`:""}
     <div class="chips">${chips.map(([k,c])=>`<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>`;
   el.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>reply(T[lang].say[b.dataset.opt]));
+  $("#listenCard").onclick=()=>speakCard(msg.replace(/upi:\/\/\S+/g,lang==="hi"?"भुगतान लिंक":"the pay link"));
 }
 
 async function grant(){
   let from=+$("#c_from").value,to=+$("#c_to").value;if(to<=from){from=8;to=19}
   const body={notice_version:META.notice_version,language:lang,early_warning_alerts:$("#c_ew").checked,soundbox_cue:$("#c_sb").checked,repeat_offers:$("#c_ro").checked,channel:"app",contact_window:[from,to]};
-  await post(`/merchant/${mid}/consent`,body);toast("Permission saved. The shop owner can take it back any time.");await refresh();
+  await post(`/merchant/${mid}/consent`,body);toast(`Permission saved (notice ${META.notice_version}). The shop owner can take it back any time.`);await refresh();
 }
 async function withdraw(){await api(`/merchant/${mid}/consent`,{method:"DELETE"});last=null;toast("Permission taken back. Pakka won't message this shop.");await refresh()}
 
@@ -411,6 +449,12 @@ async function offers(){
   await refresh();return r;
 }
 
+// Read the app card aloud on the owner's phone: Sarvam voice if set up, otherwise the browser's voice.
+function speakCard(text){
+  const fallback=()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=lang==="hi"?"hi-IN":"en-IN";speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
+  fetch("/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,lang})})
+   .then(async r=>{if(!r.ok)throw 0;new Audio(URL.createObjectURL(await r.blob())).play()}).catch(fallback);
+}
 function playCue(text){
   const lng=P[mid].language;text=text||META.soundbox_cues[lng];lastCue=text;
   $("#cue").textContent="🔊 “"+text+"”";const sb=$("#soundbox");sb.classList.add("play");
@@ -460,14 +504,18 @@ $("#send").onclick=()=>reply();$("#replyText").onkeydown=e=>{if(e.key==="Enter")
 $("#offers").onclick=offers;$("#withdraw").onclick=withdraw;
 $("#replay").onclick=()=>playCue(lastCue);
 $("#tech").onchange=async e=>{tech=e.target.checked;await refresh()};
-$("#reset").onclick=async()=>{await post("/merchant/reset");last=null;offerBlocked=null;lastCue=null;toast("Demo reset.");await select(mid)};
-document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{lang=b.dataset.lang;document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x===b));await refresh()});
+$("#reset").onclick=async()=>{await post("/merchant/reset");last=null;cvOut="";declined={};offerBlocked=null;lastCue=null;toast("Demo reset.");await select(mid)};
+document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{lang=b.dataset.lang;{const p=P[mid];if(p)$("#phLender").textContent=lang==="hi"?`बिज़नेस ऐप (डेमो) · लोन: ${p.lender}`:`Business app (demo) · loan from ${p.lender}`}document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x===b));await refresh()});
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+// Voice: the transcript goes into the reply box for the owner to check, edit and send. Never auto-sent.
 $("#mic").onclick=()=>{
-  if(!SR){toast("Voice input needs a browser with the Web Speech API (Chrome or Edge). Type the reply instead.");return}
+  const t=T[lang];
+  if(!SR){toast(t.micNo);return}
   const rec=new SR();rec.lang=lang==="hi"?"hi-IN":"en-IN";rec.interimResults=false;
   $("#mic").classList.add("on");rec.onend=()=>$("#mic").classList.remove("on");
-  rec.onresult=e=>{const t=e.results[0][0].transcript;$("#replyText").value=t;reply(t)};rec.start();
+  rec.onerror=e=>{$("#mic").classList.remove("on");toast(e.error==="not-allowed"||e.error==="service-not-allowed"?t.micDenied:t.micErr)};
+  rec.onresult=e=>{const box=$("#replyText");box.value=e.results[0][0].transcript;box.focus();toast(t.micCheck)};
+  try{rec.start()}catch(e){$("#mic").classList.remove("on");toast(t.micErr)}
 };
 
 // Guided tour: /merchant?tour=1 runs the demo script against the live API with captions.
