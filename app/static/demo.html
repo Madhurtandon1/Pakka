@@ -244,6 +244,8 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 .assist{padding:24px 24px 24px 0;display:flex;flex-direction:column;gap:16px;min-width:0}
 @media(max-width:860px){.assist{padding:0 16px 24px}}
 .pakka{border:1.5px solid var(--line);transition:border-color .2s,box-shadow .2s}
+.jump{position:fixed;right:18px;bottom:18px;z-index:60;background:var(--navy);color:#fff;border:0;border-radius:999px;padding:12px 18px;font:600 14px var(--body);box-shadow:0 10px 30px -8px rgba(0,30,80,.5);cursor:pointer}
+.status.off{color:var(--amber)}
 .pakka.show{border-color:var(--cyan);box-shadow:0 14px 36px -10px rgba(0,186,242,.35)}
 .pakka .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .who{display:flex;align-items:center;gap:10px}.who b{color:var(--ink);font-size:16px;font-family:var(--display);font-weight:600}
@@ -333,10 +335,10 @@ body.embed .dbar{display:none}
 <aside class="assist">
 <section class="card pakka" id="pakka">
 <div class="head">
-<div class="who"><div class="av">✦</div><div><b>Pakka AI</b><div class="status"><span class="a">Watching your journey</span><span class="b">Stepped in to help</span></div></div></div>
+<div class="who"><div class="av">✦</div><div><b>Pakka AI</b><div class="status"><span class="a" id="watch">Watching your journey</span><span class="b">Stepped in to help</span></div></div></div>
 <div class="lang"><button data-lang="en" class="on">English</button><button data-lang="hi">हिंदी</button></div>
 </div>
-<div class="idle"><div class="bubble">Hi Samina! I'm keeping an eye on your application. If anything gets stuck, I'll explain what went wrong and help you fix it.</div></div>
+<div class="idle"><div class="bubble" id="note">Hi Samina! I'm keeping an eye on your application. If anything gets stuck, I'll explain what went wrong and help you fix it.</div></div>
 <div class="live">
 <div class="bubble msg" id="msg"></div>
 <div class="why">Why Pakka stepped in</div>
@@ -349,6 +351,7 @@ body.embed .dbar{display:none}
 <section class="card sm"><h3>How we tested it</h3><div id="eval" class="muted">Loading test results…</div></section>
 </aside>
 </div>
+<button class="jump" id="jump" hidden>✦ Pakka has a suggestion ↓</button>
 <div class="cap" id="cap"><div class="n"></div><div class="t"></div><div class="prog"><i></i></div>
 <div class="row" style="display:none"><a class="pill solid" href="/demo" target="_top">Try it yourself</a><a class="pill" href="/" target="_top">Back to Pakka</a></div></div>
 </main>
@@ -360,15 +363,37 @@ let jid,clock=0,step="basic",lang="en",last=null,open=false,done=false;
 const $=s=>document.querySelector(s);
 
 async function api(path,opt){const r=await fetch(path,opt);if(!r.ok)throw new Error(await r.text());return r.headers.get("content-type")?.includes("json")?r.json():r}
-async function send(type,code){clock+=Math.round(5+Math.random()*10);await api(`/journeys/${jid}/events`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,step,ts:clock,code})});await check("event")}
+// Every event is also kept here, so if the server forgets the journey (a restart, or a sleeping
+// free instance waking up) the page starts a new one and replays the events. Pakka keeps tracking.
+let history=[];
+const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
+function setWatch(t,off){const w=$("#watch");if(w)w.textContent=t;$(".status").classList.toggle("off",!!off)}
+async function newJourney(){jid=(await api("/journeys",{method:"POST"})).journey_id}
+async function jcall(path,opt){
+  for(let i=0;;i++){
+    try{const r=await api(path(),opt);if(i)setWatch("Watching your journey");return r}
+    catch(e){
+      const msg=String(e&&e.message||e);
+      if(msg.includes("unknown journey")){
+        setWatch("Reconnecting…",true);await newJourney();
+        for(const ev of history)await api(`/journeys/${jid}/events`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(ev)});
+        continue}
+      if(i<6){setWatch("Reconnecting to the server…",true);await sleepMs(1500*(i+1));continue}  // server waking up
+      setWatch("Can't reach the server. Refresh the page.",true);throw e}}}
+async function send(type,code){
+  clock+=Math.round(5+Math.random()*10);
+  const ev={type,step,ts:clock,code};history.push(ev);
+  try{await jcall(()=>`/journeys/${jid}/events`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(ev)});
+    await check("event");if(!open)noteFor(ev)}
+  catch(e){console.warn("Pakka could not track this step:",e)}}
 async function go(next){step=next;await send("step_view");render()}
 
 async function check(trigger){
   $("#clock").textContent=clock+"s";
-  const d=await api(`/journeys/${jid}/rescue?now=${clock}&lang=${lang}&dry=true`);
+  const d=await jcall(()=>`/journeys/${jid}/rescue?now=${clock}&lang=${lang}&dry=true`);
   if(!d.detection.stalled){hide();return}
   if(open&&trigger==="tick")return;
-  last=await api(`/journeys/${jid}/rescue?now=${clock}&lang=${lang}`);
+  last=await jcall(()=>`/journeys/${jid}/rescue?now=${clock}&lang=${lang}`);
   show(last);loadAudit();
 }
 let tech=false;   // "Show technical details": codes instead of plain words
@@ -396,14 +421,35 @@ function show(r){
   $("#chips").innerHTML=list.filter(Boolean).map(c=>`<span class="chip ${c.startsWith("escalated")?"warn":""}">${c}</span>`).join("");
   $("#yes").style.display=r.needs_consent?"":"none";$("#yes").textContent=lang==="hi"?"हाँ, मदद करो":"Yes, help me";
   renderChecklist();
+  $("#jump").hidden=msgInView();   // only when Pakka's message is off-screen
 }
-function hide(){open=false;$("#pakka").classList.remove("show");renderChecklist()}
+const WHAT={PAN_FORMAT:"the PAN didn't look right",PAN_NOT_LINKED:"your PAN isn't linked to Aadhaar",NAME_MISMATCH:"the names don't match",
+  AADHAAR_FORMAT:"the Aadhaar number didn't look right",OTP_NOT_RECEIVED:"the OTP didn't arrive",MOBILE_NOT_LINKED:"your mobile isn't linked to Aadhaar",
+  FACE_MISMATCH:"the selfie didn't match your ID",LIVENESS:"the face check didn't pass",IFSC_FORMAT:"the IFSC didn't look right",
+  ACCOUNT_NAME_MISMATCH:"the account name doesn't match",PENNY_DROP_FAILED:"the ₹1 check didn't go through",
+  MANDATE_BANK_UNSUPPORTED:"your bank doesn't support this auto-pay method",MANDATE_OTP_TIMEOUT:"the auto-pay OTP timed out",NO_DEBIT_CARD:"there's no debit card for this account",
+  NOT_REGISTERED:"there's no DigiLocker account"};
+function setNote(en,hi){const n=$("#note");if(n)n.textContent=lang==="hi"?hi:en}
+function noteFor(ev){
+  const t=TITLE[ev.step]||ev.step,nx=TITLE[STEPS[STEPS.indexOf(ev.step)+1]]||"";
+  const fail=["check_failed","upload_failed","liveness_failed","digilocker_error"].includes(ev.type);
+  if(fail){const what=WHAT[ev.code]||PHOTO[ev.code]||"that didn't go through";
+    return setNote(`Noted: ${what}. Try once more. If it happens again, I'll step in and help.`,
+      `ध्यान दिया: ${t} में दिक्कत आई। एक बार और कोशिश कीजिए। फिर से हुआ तो मैं मदद करूँगा।`)}
+  if(ev.type==="doc_failed")return;  // the checklist shows the reason
+  if(ev.type==="check_ok"||ev.type==="upload_ok")return setNote(`✓ ${t} done.${nx?" Next: "+nx+".":""} I'm still watching.`,`✓ ${t} पूरा।${nx?" अगला: "+nx+"।":""} मैं ध्यान रख रहा हूँ।`);
+  if(ev.type==="doc_ok")return setNote("✓ Income document checked. I'm still watching.","✓ आय का दस्तावेज़ जाँच लिया। मैं ध्यान रख रहा हूँ।");
+  if(ev.type==="step_view"&&ev.step==="basic")return;   // keep the greeting on the first screen
+  if(ev.type==="step_view")return setNote(`You're on ${t}. I'm watching for anything that gets stuck.`,`आप ${t} पर हैं। कहीं अटकें तो मैं मदद करूँगा।`);
+  if(ev.type==="submit")return setNote("Application submitted. Well done!","आवेदन जमा हो गया। बहुत बढ़िया!")}
+
+function hide(){open=false;$("#pakka").classList.remove("show");$("#jump").hidden=true;renderChecklist()}
 
 async function relang(l){
   lang=l;document.querySelectorAll("[data-lang]").forEach(b=>b.classList.toggle("on",b.dataset.lang===l));
   if(!last)return;const d=last.detection;
   const r=await api(`/explain?action=${last.action}&lang=${l}&step=${d.step||""}&code=${d.code||""}`);
-  last.message=r.message;show(last);
+  last.message=r.message;if(open)show(last);
 }
 
 const EFFECT={
@@ -666,7 +712,10 @@ async function loadEval(tries=3){try{const e=await api("/eval");let docs=null;tr
 
 $("#yes").onclick=()=>{const a=last?.action;(EFFECT[a]||(()=>toast("Done.")))();if(a!=="guided_recapture")hide()};
 $("#no").onclick=hide;
-$("#tech").onchange=e=>{tech=e.target.checked;if(last)show(last);drawPreview();loadAudit();loadEval()};
+$("#jump").onclick=()=>{$("#pakka").scrollIntoView({behavior:"smooth",block:"center"});$("#jump").hidden=true};
+function msgInView(){const m=$("#msg").getBoundingClientRect();return m.top>=60&&m.bottom<=innerHeight}
+addEventListener("scroll",()=>{if(open&&msgInView())$("#jump").hidden=true},{passive:true});
+$("#tech").onchange=e=>{tech=e.target.checked;if(last&&open)show(last);drawPreview();loadAudit();loadEval()};
 $("#listen").onclick=async()=>{const text=$("#msg").textContent;
   try{const r=await fetch("/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,lang})});
     if(r.ok){new Audio(URL.createObjectURL(await r.blob())).play();return}}catch(e){}
@@ -674,7 +723,7 @@ $("#listen").onclick=async()=>{const text=$("#msg").textContent;
 document.querySelectorAll("[data-lang]").forEach(b=>b.onclick=()=>relang(b.dataset.lang));
 document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dataset.tick;check("tick")});
 
-(async()=>{jid=(await api("/journeys",{method:"POST"})).journey_id;await send("step_view");render();loadAudit();loadEval()})();
+(async()=>{await jcall(()=>"/journeys",{method:"POST"}).then(r=>{jid=r.journey_id});await send("step_view");render();loadAudit();loadEval()})();
 </script>
 <script>
 // Sidebar: Loans shows the journey; the other tabs are honest placeholders.
