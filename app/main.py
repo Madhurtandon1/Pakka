@@ -1,5 +1,7 @@
 import json
+import threading
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -7,7 +9,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from app.merchant_api import router as merchant_router
-from pakka import sarvam
+from pakka import aadhaar, sarvam
 from pakka.agent import rescue
 from pakka.doccheck import check_image
 from pakka.explain import kfs_term
@@ -17,7 +19,15 @@ from pakka.store import Store
 STATIC = Path(__file__).with_name("static")
 RESULTS = Path(__file__).resolve().parents[1] / "eval" / "results.json"
 
-app = FastAPI(title="Pakka prototype", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Load the Aadhaar card reader in the background so the first upload isn't slow.
+    threading.Thread(target=aadhaar.warm_up, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Pakka prototype", version="0.1.0", lifespan=lifespan)
 app.include_router(merchant_router)
 store = Store()
 journeys: set[str] = set()
@@ -40,7 +50,7 @@ def demo():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "sarvam": sarvam.enabled()}
+    return {"ok": True, "sarvam": sarvam.enabled(), "card_reader": aadhaar.state()}
 
 
 @app.post("/journeys")

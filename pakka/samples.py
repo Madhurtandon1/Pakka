@@ -1,7 +1,8 @@
 """Sample ID documents for the demo upload step.
 
 Each sample is drawn here so the real photo check (doccheck.py) judges it, not a flag.
-They are generic cards marked "SAMPLE", not a copy of any real ID design.
+They are generic cards marked "SAMPLE", not a copy of any real ID design, and show only a
+masked number (XXXX XXXX 1234), so no real Aadhaar number is ever generated.
 """
 import cv2
 import numpy as np
@@ -22,8 +23,9 @@ def _card(img: np.ndarray, x: int, y: int) -> None:
     cv2.rectangle(img, (px, py), (px + 190, py + 240), (190, 196, 204), -1)
     cv2.circle(img, (px + 95, py + 95), 48, (120, 128, 140), -1)
     cv2.ellipse(img, (px + 95, py + 230), (80, 70), 0, 180, 360, (120, 128, 140), -1)
-    lines = [("Name", "Samina P."), ("Date of birth", "01 / 01 / 1995"), ("Gender", "F"),
-             ("ID number", "XXXX XXXX 1234"), ("Address", "12 Sample Road, New Delhi")]
+    # Masked format (only the last 4 digits), as UIDAI's masked Aadhaar shows: no real number appears.
+    lines = [("Name", "Samina P."), ("Date of birth", "01/01/1995"), ("Gender", "FEMALE"),
+             ("Aadhaar no. (masked)", "XXXX XXXX 1234"), ("Address", "12 Sample Road, New Delhi")]
     for i, (k, v) in enumerate(lines):
         ty = y + 140 + i * 58
         cv2.putText(img, k, (x + 270, ty), font, 0.6, (110, 118, 130), 1, cv2.LINE_AA)

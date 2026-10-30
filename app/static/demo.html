@@ -197,7 +197,9 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 .preview{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;background:#fff}
 .preview.guide{outline:2.5px dashed var(--cyan);outline-offset:3px}
 .preview .pv{width:320px;max-width:50%;aspect-ratio:3/2;border-radius:8px;background:var(--ink2);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.preview .pv{position:relative}
 .preview .pv img{width:100%;height:100%;object-fit:contain}
+#demo .preview .reveal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.92);font-size:13px}
 .preview .pv .pdf{color:#D8F4FF;text-align:center;font-size:12.5px;padding:10px}
 .preview .pv .pdf svg{width:42px;height:42px;stroke:#D8F4FF;fill:none;stroke-width:1.5;display:block;margin:0 auto 6px}
 .preview .meta{flex:1;min-width:0;font-size:13px;color:var(--muted);line-height:1.55}
@@ -342,10 +344,12 @@ async function check(trigger){
 let tech=false;   // "Show technical details": codes instead of plain words
 const PROBLEM={bad_photo:"The photo didn't go through",wrong_format:"Wrong file type",liveness:"The face check keeps failing",
   digilocker:"No DigiLocker account",offer_jargon:"Stuck on the loan terms",timeout:"Away from the application for a while"};
-const FIX={guided_recapture:"Help retaking the photo",convert_file:"Convert the file",retry_liveness_tips:"Tips for the face check",
+const FIX={guided_recapture:"Help retaking the photo",convert_file:"Help with the file type",retry_liveness_tips:"Tips for the face check",
   switch_to_video_kyc:"A video call instead",digilocker_setup_help:"Help setting up DigiLocker",explain_kfs:"Explain the loan terms",
   send_resume_link:"A link to continue later",schedule_callback:"A call from our team",human_handoff:"Passed to a person"};
-const PHOTO={IMG_CROPPED:"a corner is cut off",IMG_BLUR:"it's blurry",IMG_GLARE:"there's glare",FILE_FORMAT:"it isn't a photo"};
+const PHOTO={IMG_CROPPED:"a corner is cut off",IMG_BLUR:"it's blurry",IMG_GLARE:"there's glare",FILE_FORMAT:"it isn't a photo",
+  NOT_AADHAAR:"it doesn't look like an Aadhaar card",AADHAAR_BACK:"this is the back of the card, and we need the front",
+  AADHAAR_UNREADABLE:"the Aadhaar number couldn't be read clearly"};
 const LANGS={en:"English",hi:"Hindi"};
 
 function show(r){
@@ -366,7 +370,7 @@ async function relang(l){
 
 const EFFECT={
   guided_recapture:()=>{guideOn=true;step="kyc";render()},
-  convert_file:()=>toast("File converted to PDF (demo). Try uploading again."),
+  convert_file:()=>toast("Tip: upload a JPG or PNG photo of the front of the card. A screenshot of the e-Aadhaar PDF works too."),
   switch_to_video_kyc:()=>toast("Video call booked (demo)."),
   digilocker_setup_help:()=>toast("DigiLocker setup guide opened (demo)."),
   schedule_callback:()=>toast("Our team will call you (demo)."),
@@ -391,9 +395,9 @@ function render(){
   <div class="docs">
   <div class="doc now"><div class="ic">${ICON}</div><div class="t"><b>Identity proof</b><span>Aadhaar card, front side</span></div><span class="st need">Action needed</span>
    <div class="upl">${guideOn?`<div class="frame">Keep all four corners inside the frame</div>`:""}
-   <div class="pick"><div class="h">Demo · choose which file to upload</div>
-    <div class="row">${SAMPLES.map(([k,l])=>`<button data-sample="${k}" class="${pick&&pick.kind===k?"on":""}">${l}</button>`).join("")}
-    <label class="btn">Your own photo…<input type="file" id="file" hidden></label></div></div>
+   <div class="row"><label class="btn primary">📷 Upload your Aadhaar photo…<input type="file" id="file" accept="image/*" hidden></label></div>
+   <div class="pick"><div class="h">Or try a sample file (demo)</div>
+    <div class="row">${SAMPLES.map(([k,l])=>`<button data-sample="${k}" class="${pick&&pick.kind===k?"on":""}">${l}</button>`).join("")}</div></div>
    <div id="preview"></div>
    <div class="muted" id="doc"></div></div></div>
   ${doc("PAN card","From basic details","Verified","ok")}
@@ -437,7 +441,7 @@ async function choose(kind,file){
   if(pick)URL.revokeObjectURL(pick.url);
   let blob=file,name=file&&file.name;
   if(kind){const r=await fetch(`/samples/${kind}`);blob=await r.blob();name=(r.headers.get("content-disposition")||"").match(/filename="([^"]+)"/)?.[1]||kind}
-  pick={kind,blob,name,type:blob.type||"",url:URL.createObjectURL(blob),result:null};
+  pick={kind,blob,name,type:blob.type||"",url:URL.createObjectURL(blob),result:null,hidden:!kind};
   document.querySelectorAll("[data-sample]").forEach(b=>b.classList.toggle("on",b.dataset.sample===kind));
   $("#doc").textContent="";drawPreview();
 }
@@ -445,18 +449,26 @@ function drawPreview(){
   const P=$("#preview");if(!P)return;
   const g=guideOn?" guide":"";
   if(!pick){P.innerHTML=`<div class="preview${g}"><div class="pv"><div class="pdf">${FILE}No file chosen yet</div></div><div class="meta">Choose a file above. You'll see it here <b style="font-size:13px">before</b> anything is sent.</div></div>`;return}
-  const img=pick.type.startsWith("image/"),r=pick.result;
-  const verdict=checking?`<span class="verdict wait">Checking the photo…</span>`
+  const img=pick.type.startsWith("image/"),r=pick.result,c=r&&r.card;
+  // After the check, your own photo is replaced by the server's copy with the number blacked out.
+  const src=!pick.kind&&c&&c.masked_preview?c.masked_preview:pick.url;
+  const verdict=checking?`<span class="verdict wait">Reading the card… (a few seconds)</span>`
     :!r?`<span class="verdict wait">Not sent yet</span>`
-    :r.ok?`<span class="verdict ok">✓ Photo check passed</span>`
+    :r.ok?`<span class="verdict ok">✓ ${passText(c)}</span>`
     :`<span class="verdict bad">✗ Didn't pass: ${r.issues.map(i=>PHOTO[i]||i).join(" and ")}</span>`;
-  const m=r&&tech&&r.metrics.sharpness!=null?`<div>sharpness ${r.metrics.sharpness} (needs ≥ 60) · glare ${(r.metrics.glare_ratio*100).toFixed(1)}% (max 6%) · card found: ${r.metrics.card_found?"yes":"no"}</div>`:"";
-  P.innerHTML=`<div class="preview${g}"><div class="pv">${img?`<img src="${pick.url}" alt="Preview of ${esc(pick.name)}">`:`<div class="pdf">${FILE}${esc(pick.name)}<br>This isn't a photo, so it can't be shown</div>`}</div>
+  const m=r&&tech&&r.metrics.sharpness!=null?`<div>sharpness ${r.metrics.sharpness} (needs ≥ 60) · glare ${(r.metrics.glare_ratio*100).toFixed(1)}% (max 6%) · card found: ${r.metrics.card_found?"yes":"no"}${c?` · card: ${c.status}, found ${c.fields.join(", ")||"nothing"}, check digit ${c.checksum_ok===true?"valid":c.checksum_ok===false?"invalid":"n/a"}, read in ${c.ocr_ms} ms`:" · card reading off"}</div>`:"";
+  P.innerHTML=`<div class="preview${g}"><div class="pv">${img?`<img src="${src}" alt="Preview of ${esc(pick.name)}" style="${pick.hidden?"filter:blur(14px)":""}">${pick.hidden?`<button class="reveal" id="reveal">👁 Show photo</button>`:""}`:`<div class="pdf">${FILE}${esc(pick.name)}<br>This isn't a photo, so it can't be shown</div>`}</div>
    <div class="meta"><div>Preview · this is what will be sent</div><b>${esc(pick.name)}</b><div>${size(pick.blob.size)} · ${kindOf(pick.type)}</div>${verdict}${m}
    <div class="row"><button class="primary" id="sendDoc" ${checking||(r&&r.ok)?"disabled":""}>Submit this document</button><button id="clearDoc">Choose another</button></div>
-   <div style="font-size:12px;margin-top:6px">Checked on our server for blur, glare and cut-off corners. Not stored.</div></div></div>`;
+   <div style="font-size:12px;margin-top:6px">Checked on our server: photo quality, then the card is read to find the Aadhaar number and confirm its check digit. Nothing is stored, and only the last 4 digits are shown. This is a document check, not UIDAI verification.</div></div></div>`;
   $("#sendDoc").onclick=submitDoc;
+  if($("#reveal"))$("#reveal").onclick=()=>{pick.hidden=false;drawPreview()};
   $("#clearDoc").onclick=()=>{URL.revokeObjectURL(pick.url);pick=null;document.querySelectorAll("[data-sample]").forEach(b=>b.classList.remove("on"));drawPreview()};
+}
+function passText(c){
+  if(!c)return "Photo check passed (card reading is off on this server)";
+  if(c.status==="verified")return `Aadhaar card verified · number ${c.number} · check digit valid`;
+  return `Aadhaar card read · masked number ${c.number}${c.sample?" · sample card":""}`;
 }
 async function submitDoc(){
   if(!pick||checking)return;
@@ -464,8 +476,8 @@ async function submitDoc(){
   const fd=new FormData();fd.append("file",pick.blob,pick.name);
   let r;try{r=await api("/doccheck",{method:"POST",body:fd})}finally{checking=false}
   pick.result=r;drawPreview();
-  $("#doc").textContent=tech?`Doc check: ${r.ok?"looks good":r.issues.join(", ")} · sharpness ${r.metrics.sharpness??"-"} · glare ${r.metrics.glare_ratio??"-"}`
-    :`Photo check: ${r.ok?"looks good":"didn't pass, because "+r.issues.map(i=>PHOTO[i]||i).join(" and ")}`;
+  $("#doc").textContent=tech?`Doc check: ${r.ok?"ok":r.issues.join(", ")} · card ${r.card?r.card.status:"off"} · sharpness ${r.metrics.sharpness??"-"} · glare ${r.metrics.glare_ratio??"-"}`
+    :r.ok?"Identity proof accepted. Moving to your loan offer…":`Didn't pass, because ${r.issues.map(i=>PHOTO[i]||i).join(" and ")}. Try another photo.`;
   if(r.ok){await new Promise(s=>setTimeout(s,2000));await send("upload_ok");hide();URL.revokeObjectURL(pick.url);pick=null;guideOn=false;await go("offer")}
   else await send("upload_failed",r.issues[0]);
 }
@@ -527,6 +539,7 @@ document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dat
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const cap=document.getElementById("cap");
   const click=s=>{const el=document.querySelector(s);if(el)el.click()};
+  const idle=async()=>{await sleep(200);while(checking)await sleep(200)};  // wait for the server's check
   let hl=null;
   function focus(s){
     if(hl)hl.classList.remove("tour-hl");
@@ -539,14 +552,14 @@ document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dat
   const STEPS=[
     ["Samina is applying for a personal loan. Her details are already filled in.","#screen",()=>click("#next")],
     ["At KYC she chooses a photo of her ID card. The app shows a preview first, so she sees exactly what will be sent.","#preview",()=>click("[data-sample=cropped]")],
-    ["She submits it. Our photo check runs on the server and finds a corner of the card cut off.","#preview",async()=>{await sleep(300);click("#sendDoc")}],
-    ["She sends the same photo again, and it fails again. She hasn't asked for help, but Pakka notices she's stuck.","#pakka",()=>click("#sendDoc")],
+    ["She submits it. The server checks the photo and reads the card, and finds a corner of the card cut off.","#preview",async()=>{await sleep(300);click("#sendDoc");await idle()}],
+    ["She sends the same photo again, and it fails again. She hasn't asked for help, but Pakka notices she's stuck.","#pakka",async()=>{click("#sendDoc");await idle()}],
     ["Pakka explains what went wrong and shows exactly why it stepped in.","#pakka",null],
     ["The same help in Hindi, which she can also listen to.","#pakka",()=>click("[data-lang=hi]")],
     ["She says yes. Nothing happens without her consent, and a guide shows how to fit the whole card in the frame.",".doc.now",()=>click("#yes")],
-    ["Her next photo is blurry. Rather than loop, Pakka hands her to a person who can see everything so far.","#preview",async()=>{click("[data-sample=blurry]");await sleep(600);click("#sendDoc")}],
+    ["Her next photo is blurry. Rather than loop, Pakka hands her to a person who can see everything so far.","#preview",async()=>{click("[data-sample=blurry]");await sleep(600);click("#sendDoc");await idle()}],
     ["Every step Pakka takes is written down.","#audit",null],
-    ["She retakes it properly: the whole card, sharp, no glare. Preview, submit, and the photo check passes.","#preview",async()=>{click("[data-lang=en]");await sleep(300);click("[data-sample=good]");await sleep(900);click("#sendDoc")}],
+    ["She retakes it properly: the whole card, sharp, no glare. The card is read, the number is found, and it passes.","#preview",async()=>{click("[data-lang=en]");await sleep(300);click("[data-sample=good]");await sleep(900);click("#sendDoc");await idle()}],
     ["She reaches her loan offer.","#screen",null],
     ["She opens the Key Fact Statement and hesitates for two minutes.","#kfs",()=>{click("#kfs");setTimeout(()=>click("[data-tick='120']"),400)}],
     ["Pakka explains APR, EMI, fees, the cooling-off period and foreclosure in plain words.","#pakka",null],

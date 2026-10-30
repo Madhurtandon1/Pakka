@@ -8,11 +8,17 @@ PHOTO_REASONS = {
         "IMG_CROPPED": "a corner of the card was cut off",
         "IMG_BLUR": "the photo was blurry",
         "IMG_GLARE": "there was glare on the card",
+        "NOT_AADHAAR": "it didn't look like an Aadhaar card",
+        "AADHAAR_BACK": "it showed the back of the card, and we need the front",
+        "AADHAAR_UNREADABLE": "the Aadhaar number couldn't be read clearly",
     },
     "hi": {
         "IMG_CROPPED": "कार्ड का एक कोना कट जाने",
         "IMG_BLUR": "फ़ोटो धुंधली होने",
         "IMG_GLARE": "कार्ड पर चमक होने",
+        "NOT_AADHAAR": "आधार कार्ड जैसी न दिखने",
+        "AADHAAR_BACK": "कार्ड का पिछला हिस्सा होने (हमें सामने वाला हिस्सा चाहिए)",
+        "AADHAAR_UNREADABLE": "आधार नंबर साफ़ न पढ़ा जा सकने",
     },
 }
 
@@ -49,8 +55,8 @@ TEMPLATES = {
         "hi": "आपकी आधार फ़ोटो {reason} की वजह से नहीं गई। चलिए साथ में दोबारा लेते हैं: कार्ड के चारों कोने फ्रेम के अंदर रखिए।",
     },
     "convert_file": {
-        "en": "That file type isn't accepted. I can convert it to PDF for you, or you can upload a JPG or PDF instead.",
-        "hi": "यह फ़ाइल टाइप स्वीकार नहीं होता। मैं इसे PDF में बदल सकता हूँ, या आप JPG या PDF अपलोड करें।",
+        "en": "That file type isn't accepted here. Please upload a photo of the front of your Aadhaar card (JPG or PNG). If you have the e-Aadhaar PDF, a screenshot of it works too.",
+        "hi": "यह फ़ाइल टाइप यहाँ स्वीकार नहीं होता। कृपया अपने आधार कार्ड के सामने वाले हिस्से की फ़ोटो (JPG या PNG) अपलोड करें। अगर आपके पास ई-आधार PDF है, तो उसका स्क्रीनशॉट भी चलेगा।",
     },
     "retry_liveness_tips": {
         "en": "The face check didn't pass. Sit in good light, take off your glasses and hold the phone at eye level, then try once more.",

@@ -9,7 +9,31 @@ from typing import Optional
 
 from .models import DISTRESS, ConsentIn, ConsentRecord
 
-_lock = threading.Lock()
+_lock = threading.RLock()
+
+
+class _Rows(list):
+    """Fully fetched result rows that still answer fetchone()/fetchall() like a cursor."""
+    def fetchone(self):
+        return self[0] if self else None
+
+    def fetchall(self):
+        return self
+
+
+class _Serialised:
+    """The shared connection, with every statement run under the lock and fetched at once.
+    FastAPI serves requests on several threads, and an unlocked read could collide with another
+    thread's statement on the same connection (seen as an intermittent IndexError)."""
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def execute(self, sql: str, args: tuple = ()):
+        with _lock:
+            return _Rows(self._conn.execute(sql, args).fetchall())
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
 
 SCHEMA = """
 create table if not exists merchant_consent (
@@ -41,9 +65,10 @@ TABLES = ["merchant_consent", "merchant_episodes", "merchant_requests", "merchan
 class MerchantStore:
     def __init__(self, path: str | None = None):
         self.path = path or os.getenv("PAKKA_DB", ":memory:")
-        self.db = sqlite3.connect(self.path, check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
-        self.db.executescript(SCHEMA)
+        conn = sqlite3.connect(self.path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA)
+        self.db = _Serialised(conn)
 
     def _write(self, sql: str, args: tuple = ()) -> None:
         with _lock:
