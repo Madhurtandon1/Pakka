@@ -1,6 +1,6 @@
 {
- "scenarios": 22,
- "passed": 22,
+ "scenarios": 25,
+ "passed": 25,
  "note": "Loan document steps only. Reported separately from the 30/30 scripted scenarios and the held-out score; written alongside the rules, so it checks the logic, not real-world accuracy.",
  "results": [
   {
@@ -264,6 +264,42 @@
    "got": [
     "mandate_failed",
     "human_handoff"
+   ],
+   "pass": true
+  },
+  {
+   "name": "Bank statement is password-protected",
+   "expected": [
+    "income_doc",
+    "explain_doc_issue"
+   ],
+   "got": [
+    "income_doc",
+    "explain_doc_issue"
+   ],
+   "pass": true
+  },
+  {
+   "name": "Statement too old, second help: re-upload",
+   "expected": [
+    "income_doc",
+    "guided_reupload"
+   ],
+   "got": [
+    "income_doc",
+    "guided_reupload"
+   ],
+   "pass": true
+  },
+  {
+   "name": "Statement fixed with a good upload",
+   "expected": [
+    null,
+    null
+   ],
+   "got": [
+    null,
+    null
    ],
    "pass": true
   }

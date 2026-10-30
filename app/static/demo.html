@@ -218,6 +218,10 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 #demo .ck span.why{display:block;font-size:12.5px;color:var(--muted);text-transform:none;letter-spacing:normal;font-weight:400;margin-top:2px}
 .ck .st{flex:none}
 .cknote{font-size:12px;color:var(--muted);margin-top:10px}
+.ckup{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#demo .ckup .btn,#demo .ckup button{font-size:12px;padding:5px 9px;border-radius:8px}
+.ckup .s{font-size:11.5px;color:var(--muted)}
+.ckmsg{font-size:12px;margin-top:4px}.ckmsg.ok{color:var(--green)}.ckmsg.bad{color:var(--amber)}
 @media(max-width:760px){.cklist{grid-template-columns:1fr}}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin:14px 0 6px}
 @media(max-width:600px){.form{grid-template-columns:1fr}}
@@ -371,7 +375,7 @@ let tech=false;   // "Show technical details": codes instead of plain words
 const PROBLEM={bad_photo:"The photo didn't go through",wrong_format:"Wrong file type",liveness:"The face check keeps failing",
   digilocker:"No DigiLocker account",offer_jargon:"Stuck on the loan terms",timeout:"Away from the application for a while",
   pan_problem:"A problem with the PAN",aadhaar_otp:"The Aadhaar OTP didn't work",face_match:"The selfie didn't match the ID",
-  bank_verify:"The bank account couldn't be confirmed",mandate_failed:"Auto-pay couldn't be set up"};
+  bank_verify:"The bank account couldn't be confirmed",mandate_failed:"Auto-pay couldn't be set up",income_doc:"A problem with an income document"};
 const FIX={guided_recapture:"Help retaking the photo",convert_file:"Help with the file type",retry_liveness_tips:"Tips for the face check",
   switch_to_video_kyc:"A video call instead",digilocker_setup_help:"Help setting up DigiLocker",explain_kfs:"Explain the loan terms",
   send_resume_link:"A link to continue later",schedule_callback:"A call from our team",human_handoff:"Passed to a person",
@@ -379,7 +383,7 @@ const FIX={guided_recapture:"Help retaking the photo",convert_file:"Help with th
   switch_to_digilocker:"Use DigiLocker instead",offline_aadhaar_xml:"Use the offline Aadhaar file",face_match_tips:"Tips for the selfie",
   guided_selfie_retake:"Help retaking the selfie",explain_bank_issue:"Explain the bank problem",reenter_bank_details:"Type the bank details again",
   try_another_account:"Use another account",explain_mandate_issue:"Explain the auto-pay problem",switch_mandate_method:"Try another auto-pay method",
-  try_another_bank:"Use another bank for auto-pay"};
+  try_another_bank:"Use another bank for auto-pay",explain_doc_issue:"Explain the document problem",guided_reupload:"Help uploading it again"};
 const PHOTO={IMG_CROPPED:"a corner is cut off",IMG_BLUR:"it's blurry",IMG_GLARE:"there's glare",FILE_FORMAT:"it isn't a photo",
   NOT_AADHAAR:"it doesn't look like an Aadhaar card",AADHAAR_BACK:"this is the back of the card, and we need the front",
   AADHAAR_UNREADABLE:"the Aadhaar number couldn't be read clearly"};
@@ -417,6 +421,7 @@ const EFFECT={
   try_another_account:()=>toast("You can add a different savings account in your own name (demo)."),
   switch_mandate_method:()=>{method="upi";drawMethods();toast("Switched to UPI AutoPay. Tap 'Set up auto-pay' to try again.")},
   try_another_bank:()=>toast("You can set up auto-pay from another account in your name (demo)."),
+  guided_reupload:()=>toast("Download a fresh PDF without a password from your bank's app, then upload it in the checklist (demo)."),
 };
 function toast(t){$("#toast").textContent=t}
 
@@ -562,19 +567,43 @@ const DOCS={pan:["PAN card","Confirms your identity for credit checks.","pan"],
   selfie:["Selfie","Matches your face to your ID, so no one else can apply in your name.","selfie"],
   bank:["Bank account","Where the loan is paid. It must be in your name.","bank"],
   mandate:["Auto-pay setup","Pays your EMI on the due date, so you never miss one.","mandate"]};
+const MONTHS={salary:3,stmt3:3,stmt6:6};
+let incomeDocs={};  // key -> {status:"checking"|"done"|"bad", code, info}
+const INCOME_MSG={PDF_LOCKED:"It's password-protected.",STATEMENT_TOO_OLD:"It's more than 45 days old.",
+  STATEMENT_TOO_SHORT:"It doesn't cover enough months.",FILE_FORMAT:"It isn't a PDF that opens.",
+  STATEMENT_UNREADABLE:"The dates couldn't be read (it may be a scan)."};
+async function checkIncome(k,blob,name){
+  incomeDocs[k]={status:"checking"};renderChecklist();
+  const fd=new FormData();fd.append("file",blob,name);
+  const r=await api(`/pdfcheck?months=${MONTHS[k]}`,{method:"POST",body:fd});
+  incomeDocs[k]=r.ok?{status:"done",info:r}:{status:"bad",code:r.code};renderChecklist();
+  await send(r.ok?"doc_ok":"doc_failed",r.code||undefined)}
+async function sampleIncome(k,kind){const r=await fetch(`/samples/${kind}`);await checkIncome(k,await r.blob(),`${kind}.pdf`)}
 const NEED={preapproved:["pan","aadhaar"],salaried:["pan","aadhaar","salary","stmt3"],selfemployed:["pan","aadhaar","stmt6"]};
+function incomeStatus(k){const d=incomeDocs[k];
+  if(!d)return["Not started","wait"];if(d.status==="checking")return["Checking…","wait"];
+  return d.status==="done"?["Done","ok"]:["Needs attention","need"]}
+function incomeBlock(k){const d=incomeDocs[k]||{},m=MONTHS[k];
+  const msg=d.status==="done"?`<div class="ckmsg ok">✓ Covers ${d.info.from} to ${d.info.to} · ${m}-month check passed</div>`
+    :d.status==="bad"?`<div class="ckmsg bad">✗ ${INCOME_MSG[d.code]||d.code}</div>`:"";
+  return`<div class="ckup"><label class="btn">Upload PDF<input type="file" accept="application/pdf,.pdf" data-up="${k}" hidden></label>
+    <span class="s">Samples:</span>${[["statement_good","Good"],["statement_locked","Locked"],["statement_old","Too old"],["statement_short","Too short"]]
+      .map(([s,l])=>`<button data-stmt="${k}:${s}">${l}</button>`).join("")}</div>${msg}`}
 function docStatus(s){
   if(s&&(done||STEPS.indexOf(step)>STEPS.indexOf(s)))return["Done","ok"];
-  if(s&&open&&last&&last.detection.step===s)return["Needs attention","need"];
+  if(s&&open&&last&&last.detection.step===s&&last.detection.blocker!=="income_doc")return["Needs attention","need"];
   return["Not started","wait"]}
 function renderChecklist(){const C=$("#checklist");if(!C)return;
   const items=[...NEED[applicant],"selfie","bank","mandate"];
   C.innerHTML=`<div class="ckhead"><h3>Documents you'll need</h3><label>I am <select id="who">
     <option value="preapproved">Pre-approved</option><option value="salaried">Salaried</option><option value="selfemployed">Self-employed</option></select></label></div>
    <div class="cklist">${items.map(k=>{const[t,why,st]=DOCS[k];const[label,cls]=docStatus(st);
-     return`<div class="ck"><div><b>${t}</b><span class="why">${why}</span></div><span class="st ${cls}">${label}</span></div>`}).join("")}</div>
+     const[l2,c2]=st?[label,cls]:incomeStatus(k);
+     return`<div class="ck"><div><b>${t}</b><span class="why">${why}</span>${st?"":incomeBlock(k)}</div><span class="st ${c2}">${l2}</span></div>`}).join("")}</div>
    <div class="cknote">Based on Paytm's public loan pages. Exact documents depend on the lender.</div>`;
-  $("#who").value=applicant;$("#who").onchange=e=>{applicant=e.target.value;renderChecklist()}}
+  $("#who").value=applicant;$("#who").onchange=e=>{applicant=e.target.value;renderChecklist()};
+  C.querySelectorAll("[data-up]").forEach(i=>i.onchange=()=>{if(i.files[0])checkIncome(i.dataset.up,i.files[0],i.files[0].name);i.value=""});
+  C.querySelectorAll("[data-stmt]").forEach(b=>b.onclick=()=>{const[k,kind]=b.dataset.stmt.split(":");sampleIncome(k,kind)})}
 
 // Upload step: pick a file, see it, then submit. The server's photo check (OpenCV) decides pass or fail.
 const SAMPLES=[["good","✓ Good photo"],["cropped","Corner cut off"],["blurry","Blurry"],["glare","Glare"],["wrong_file","Wrong file (Word)"]];

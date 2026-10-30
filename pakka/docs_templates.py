@@ -60,6 +60,17 @@ TEMPLATES = {
     },
 }
 
+TEMPLATES.update({
+    "explain_doc_issue": {
+        "en": "There's a problem with the document you uploaded. Let's fix it.",
+        "hi": "आपके अपलोड किए दस्तावेज़ में एक दिक्कत है। चलिए इसे ठीक करते हैं।",  # HI: needs native review
+    },
+    "guided_reupload": {
+        "en": "Let's upload it again: download a fresh statement for the months asked for from your bank's app or net banking, as a PDF without a password. Or use 'Fetch from bank' if your bank offers it.",
+        "hi": "चलिए इसे दोबारा अपलोड करते हैं: अपने बैंक के ऐप या नेट बैंकिंग से माँगे गए महीनों का नया स्टेटमेंट, बिना पासवर्ड वाली PDF में डाउनलोड करें। अगर आपका बैंक 'Fetch from bank' देता है, तो उसका इस्तेमाल करें।",  # HI: needs native review
+    },
+})
+
 # Cause-specific wording for the "explain" actions.
 CODE_TEMPLATES = {
     ("explain_pan_issue", "PAN_FORMAT"): {
@@ -99,6 +110,29 @@ CODE_TEMPLATES = {
         "hi": "डेबिट कार्ड से ऑटो-पे के लिए इस खाते का डेबिट कार्ड चाहिए। आप नेट बैंकिंग या UPI AutoPay इस्तेमाल कर सकते हैं।",  # HI: needs native review
     },
 }
+
+CODE_TEMPLATES.update({
+    ("explain_doc_issue", "PDF_LOCKED"): {
+        "en": "Your bank statement is password-protected. Remove the password or use the 'Fetch from bank' option.",
+        "hi": "आपका बैंक स्टेटमेंट पासवर्ड से सुरक्षित है। पासवर्ड हटाइए या 'Fetch from bank' विकल्प का इस्तेमाल कीजिए।",  # HI: needs native review
+    },
+    ("explain_doc_issue", "STATEMENT_TOO_OLD"): {
+        "en": "This statement is more than 45 days old. Please download a recent one that includes this month.",
+        "hi": "यह स्टेटमेंट 45 दिन से ज़्यादा पुराना है। कृपया इस महीने तक का नया स्टेटमेंट डाउनलोड कीजिए।",  # HI: needs native review
+    },
+    ("explain_doc_issue", "STATEMENT_TOO_SHORT"): {
+        "en": "This statement doesn't cover enough months. Please download one that covers the full period asked for.",
+        "hi": "इस स्टेटमेंट में पूरे महीने नहीं हैं। कृपया माँगी गई पूरी अवधि का स्टेटमेंट डाउनलोड कीजिए।",  # HI: needs native review
+    },
+    ("explain_doc_issue", "FILE_FORMAT"): {
+        "en": "This file couldn't be opened as a PDF. Please upload the statement as a PDF file.",
+        "hi": "यह फ़ाइल PDF के रूप में नहीं खुली। कृपया स्टेटमेंट PDF फ़ाइल में अपलोड कीजिए।",  # HI: needs native review
+    },
+    ("explain_doc_issue", "STATEMENT_UNREADABLE"): {
+        "en": "We couldn't read the dates in this PDF. It may be a scanned photo. Please download the statement directly from your bank instead.",
+        "hi": "इस PDF में तारीखें पढ़ी नहीं जा सकीं। हो सकता है यह स्कैन की हुई फ़ोटो हो। कृपया स्टेटमेंट सीधे अपने बैंक से डाउनलोड कीजिए।",  # HI: needs native review
+    },
+})
 
 STEP_NAMES = {
     "en": {"pan": "PAN", "selfie": "selfie", "mandate": "auto-pay setup"},

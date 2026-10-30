@@ -1,4 +1,4 @@
-"""Hand-written scenarios for the loan document steps (PAN, Aadhaar OTP, selfie, bank, auto-pay).
+"""Hand-written scenarios for the loan document steps (PAN, Aadhaar OTP, selfie, bank, auto-pay, income documents).
 
 Reported separately: these are NOT part of the 30/30 scripted scenarios or the 0.85 held-out score.
 Like the 30/30, they were written alongside the rules, so they check the logic, not real-world accuracy.
@@ -26,6 +26,9 @@ def run(step, *items):
             events.append(Event(type="check_ok", step=step, ts=i))
         elif it == "live":
             events.append(Event(type="liveness_failed", step=step, ts=i))
+        elif it.startswith("doc:"):
+            code = it[4:] or None
+            events.append(Event(type="doc_failed" if code else "doc_ok", step=step, ts=i, code=code))
         else:
             events.append(Event(type="check_failed", step=step, ts=i, code=it))
     return events
@@ -55,6 +58,9 @@ SCENARIOS = [
     ("Bank doesn't support auto-pay, second help", run("mandate", "MANDATE_BANK_UNSUPPORTED"), 1, "mandate_failed", "switch_mandate_method"),
     ("Auto-pay OTP timed out twice", run("mandate", "MANDATE_OTP_TIMEOUT", "MANDATE_OTP_TIMEOUT"), 0, "mandate_failed", "explain_mandate_issue"),
     ("No debit card, third time: person", run("mandate", "NO_DEBIT_CARD"), 3, "mandate_failed", "human_handoff"),
+    ("Bank statement is password-protected", run("bank", "doc:PDF_LOCKED"), 0, "income_doc", "explain_doc_issue"),
+    ("Statement too old, second help: re-upload", run("pan", "doc:STATEMENT_TOO_OLD"), 1, "income_doc", "guided_reupload"),
+    ("Statement fixed with a good upload", run("bank", "doc:STATEMENT_TOO_SHORT", "doc:"), 0, None, None),
 ]
 
 

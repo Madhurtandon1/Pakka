@@ -22,7 +22,9 @@
     "try_another_account": {"needs_consent": true},
     "explain_mandate_issue": {"needs_consent": false},
     "switch_mandate_method": {"needs_consent": true},
-    "try_another_bank": {"needs_consent": true}
+    "try_another_bank": {"needs_consent": true},
+    "explain_doc_issue": {"needs_consent": false},
+    "guided_reupload": {"needs_consent": true}
   },
   "blockers": {
     "bad_photo": ["guided_recapture", "human_handoff"],
@@ -35,7 +37,8 @@
     "aadhaar_otp": ["resend_otp_tips", "switch_to_digilocker", "offline_aadhaar_xml", "switch_to_video_kyc", "human_handoff"],
     "face_match": ["face_match_tips", "guided_selfie_retake", "switch_to_video_kyc", "human_handoff"],
     "bank_verify": ["explain_bank_issue", "reenter_bank_details", "try_another_account", "human_handoff"],
-    "mandate_failed": ["explain_mandate_issue", "switch_mandate_method", "try_another_bank", "human_handoff"]
+    "mandate_failed": ["explain_mandate_issue", "switch_mandate_method", "try_another_bank", "human_handoff"],
+    "income_doc": ["explain_doc_issue", "guided_reupload", "human_handoff"]
   },
   "code_ladders": {
     "_note": "Optional per-cause order for a blocker. Every action here must also be in that blocker's list above (the guard checks that list).",

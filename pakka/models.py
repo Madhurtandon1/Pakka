@@ -19,6 +19,9 @@ EventType = Literal[
     # document steps: a format/verification check failed or passed (the code says which)
     "check_failed",
     "check_ok",
+    # income documents (bank statement, salary slips, ITR), uploaded from the checklist at any step
+    "doc_failed",
+    "doc_ok",
 ]
 
 

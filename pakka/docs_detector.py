@@ -17,7 +17,8 @@ RULES = {
     "bank_verify": ("bank", ("ACCOUNT_NAME_MISMATCH", "PENNY_DROP_FAILED"), ("IFSC_FORMAT",)),
     "mandate_failed": ("mandate", ("MANDATE_BANK_UNSUPPORTED", "NO_DEBIT_CARD"), ("MANDATE_OTP_TIMEOUT",)),
 }
-NEW_BLOCKERS = set(RULES)
+INCOME_CODES = ("FILE_FORMAT", "PDF_LOCKED", "STATEMENT_UNREADABLE", "STATEMENT_TOO_OLD", "STATEMENT_TOO_SHORT")
+NEW_BLOCKERS = set(RULES) | {"income_doc"}
 
 
 def detect_all(events: list[Event], now: float) -> Detection:
@@ -55,4 +56,14 @@ def detect_all(events: list[Event], now: float) -> Detection:
             if counts[code] >= 2:
                 return Detection(stalled=True, blocker=blocker, step=step, code=code,
                                  reasons=[f"{counts[code]} x {code}"])
+
+    # Income documents can be uploaded from the checklist at any step. Each of these problems is
+    # about the file itself (sending the same file again won't help), so one failure is enough.
+    # It fires right after the failed upload only, so later clicks on other steps don't re-trigger it
+    # (the checklist keeps showing "needs attention" until a good file is uploaded).
+    doc_fails = [e for e in _after_last(events, "doc_ok") if e.type == "doc_failed" and e.code in INCOME_CODES]
+    if doc_fails and events[-1].type == "doc_failed":
+        code = doc_fails[-1].code
+        return Detection(stalled=True, blocker="income_doc", step=step, code=code,
+                         reasons=[f"income document: {code}"])
     return base

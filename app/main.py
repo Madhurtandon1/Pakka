@@ -94,7 +94,10 @@ def get_explain(action: str, lang: str = "en", step: str | None = None, code: st
 
 @app.post("/doccheck")
 async def doccheck(file: UploadFile = File(...)):
-    data = await file.read()
+    try:
+        data = await file.read()
+    finally:
+        await file.close()   # deletes any temporary copy of the upload
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(413, "file too large")
     return check_image(data)
@@ -127,12 +130,26 @@ def names_check(body: NamesIn):
     return idcheck.check_names(body.pan_name, body.aadhaar_name, body.bank_name)
 
 
+@app.post("/pdfcheck")
+async def pdf_check(file: UploadFile = File(...), months: int = Query(3, ge=1, le=24)):
+    """Income document check. The file is read into memory, checked, and the upload is closed
+    (which deletes any temporary copy); nothing is stored."""
+    from pakka.pdfcheck import MAX_BYTES, check_pdf
+    try:
+        data = await file.read(MAX_BYTES + 1)
+    finally:
+        await file.close()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, "file too large (max 8 MB)")
+    return check_pdf(data, months)
+
+
 @app.get("/samples/{kind}")
 def sample_document(kind: str):
     """Demo files for the upload step: the real photo check judges them like any upload."""
-    from pakka.samples import make_sample
+    from pakka.samples import STATEMENTS, make_sample, make_statement
     try:
-        data, media, name = make_sample(kind)
+        data, media, name = (make_statement if kind in STATEMENTS else make_sample)(kind)
     except KeyError:
         raise HTTPException(404, "unknown sample")
     return Response(data, media_type=media, headers={"Content-Disposition": f'inline; filename="{name}"',
