@@ -79,17 +79,17 @@ def personas() -> dict[str, Persona]:
 
     out = [
         _make("kirana_steady", "Sharma Kirana Store", "en", "demo_nbfc_a", kirana,
-              "Steady kirana", "Sales comfortably cover the instalment every day. Pakka should never contact them."),
+              "Steady kirana", "Sales always cover the daily payment, so Pakka should never message them."),
         _make("chai_seasonal", "Ramesh Chai Stall", "hi", "demo_nbfc_a", chai,
-              "Chai stall, rainy days", "Rain cuts sales on days 9-10. Day 10 falls short; sales recover on day 11."),
+              "Chai stall, rainy days", "Rain cuts sales. On day 10 the daily payment falls short; on day 11 sales are back."),
         _make("tailor_stress", "Noor Tailors", "hi", "demo_nbfc_a", tailor,
-              "Tailor, illness", "A slow week (early warning on day 14), then illness: sales fall to zero from day 15."),
+              "Tailor, illness", "A slow week (Pakka warns early, on day 14), then illness: from day 15 sales stop."),
         _make("mobile_dispute", "City Mobile Repair", "hi", "demo_bank_b", mobile,
-              "Mobile shop, disputed deduction",
-              "Day 8 is short. Demo Bank B holds partial deductions as prepayment, so the merchant thinks they already paid."),
+              "Mobile shop, payment confusion",
+              "Day 8 is short. This lender holds part-payments until there's a full payment, so the owner thinks they already paid."),
         _make("general_late_night", "Gupta General Store", "en", "demo_nbfc_a", late,
-              "General store, late-night shortfall",
-              "Day 6 falls short and is detected at 21:30. Pakka must wait until 08:00."),
+              "General store, late at night",
+              "Day 6 falls short late at night (9:30 pm). Pakka must wait until 8 am."),
     ]
     return {p.merchant.merchant_id: p for p in out}
 

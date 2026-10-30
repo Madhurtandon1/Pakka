@@ -40,6 +40,8 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .seg button{background:none;border:0;color:#C7D1E0;padding:7px 13px}
 .seg button.on{background:#fff;color:var(--ink)}
 .spacer{flex:1}
+.techsw{display:flex;align-items:center;gap:6px;font-size:13px;color:#C7D1E0;cursor:pointer}
+.techsw input{accent-color:var(--cyan)}
 .story{max-width:1500px;margin:0 auto;padding:14px 22px 0;color:#B4C0D3;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .story b{color:#fff;font-family:var(--display);font-size:16px}
 .tag{font-size:12px;border:1px solid var(--edge);border-radius:99px;padding:3px 10px;color:#C7D1E0}
@@ -158,13 +160,14 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
 <body>
 <header class="top"><div class="row">
   <a class="brand" href="/"><i></i>Pakka <small>for Merchants</small></a>
-  <div class="ctl"><label>Merchant</label><select id="persona"></select></div>
+  <div class="ctl"><label>Shop</label><select id="persona"></select></div>
   <div class="ctl"><label>Day</label><input type="range" id="day" min="1" max="30" value="1"><span class="daylbl" id="dayLbl">Day 1</span></div>
-  <div class="ctl"><label>Clock</label><input type="time" id="clock" value="18:00"></div>
-  <button class="pill solid" id="run">Run day-end</button>
+  <div class="ctl"><label>Time</label><input type="time" id="clock" value="18:00"></div>
+  <button class="pill solid" id="run">Run the day ▶</button>
   <button class="pill" id="next">Next day ▸</button>
   <div class="seg" id="lang"><button data-lang="en" class="on">EN</button><button data-lang="hi">हिंदी</button></div>
   <span class="spacer"></span>
+  <label class="techsw"><input type="checkbox" id="tech"> Show technical details</label>
   <a class="pill" href="/merchant?tour=1">▶ Tour</a>
   <button class="pill" id="reset">Reset</button>
   <a class="pill white" href="/demo">Loan demo</a>
@@ -203,18 +206,18 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
   <!-- lender / ops -->
   <section class="ops">
     <div class="panel" id="dash">
-      <p class="h">Lender &amp; ops dashboard · all merchants</p>
+      <p class="h">Lender's view · all shops</p>
       <div class="tiles" id="tiles"></div>
       <div class="evalline" id="evalLine"></div>
     </div>
     <div class="panel" id="ledgerPanel">
-      <p class="h" id="ledgerH">Lender ledger</p>
+      <p class="h" id="ledgerH">Lender's payment record</p>
       <div class="tbl" id="ledgerTbl"></div>
-      <div class="evalline">Every figure here is the lender's. Pakka never calculates dues or charges; how a short day is handled is lender configuration.</div>
+      <div class="evalline">All amounts come from the lender. Pakka never works out what's owed or any charges.</div>
     </div>
     <div class="two">
-      <div class="panel" id="reqPanel"><p class="h">Routed to the lender</p><div id="reqs"></div></div>
-      <div class="panel" id="auditPanel"><p class="h">Audit log · this merchant</p><div class="tbl" id="auditTbl"></div></div>
+      <div class="panel" id="reqPanel"><p class="h">Sent to the lender to decide</p><div id="reqs"></div></div>
+      <div class="panel" id="auditPanel"><p class="h">Everything Pakka did · this shop</p><div class="tbl" id="auditTbl"></div></div>
     </div>
   </section>
 </main>
@@ -227,15 +230,43 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
 const $=s=>document.querySelector(s);
 let META=null,P={},mid=null,lang="en",last=null,lastCue=null,offerBlocked=null;
 
+let tech=false;   // "Show technical details": codes instead of plain words
+const PLAIN={
+  R1_shortfall:"Today's payment was short",R2_arrears_aging:"An earlier payment is still due",
+  R3_sales_dip_risk:"Sales are dropping",R4_cured:"All paid up",
+  edi_shortfall:"Payment was short",sales_dip_risk:"Sales are dropping",cured:"All paid up",
+  will_pay_today:"will pay today",will_pay_later:"will pay later",request_lower_deduction:"wants a smaller daily payment",
+  request_reschedule:"wants a new date",request_callback:"wants a call",dispute:"says the amount is wrong",
+  hardship:"is going through a hard time",already_paid:"says they already paid",unclear:"not sure",
+  notify_shortfall:"Sent a gentle warning",send_pay_link:"Sent a pay link",schedule_reminder:"Set a reminder",
+  route_lower_deduction_request:"Asked the lender for a smaller payment",route_reschedule_request:"Asked the lender for a new date",
+  schedule_callback:"Booked a call",human_handoff:"Passed to a person",show_repeat_offer:"Showed loan offers",no_action:"No message",
+};
+const GUARD={
+  G1_consent:"No permission to message",G1_skipped:"Hard time: sent to a person even without permission",
+  G2_hours:"Waiting for their message hours",G3_daily_cap:"Already messaged today",
+  G3_cadence:"Messaged yesterday, giving them a day",G4_no_upsell:"No loan offers right now",
+  G5_soundbox_safe:"Soundbox kept neutral",G6_lender_scope:"Lender doesn't allow this online, so a person will help",
+  G7_attempts:"Third try, so a person takes over",G8_distress:"Hard time or dispute, so a person takes over",
+  G8_stopped:"Reminders stopped, a person is handling it",
+};
+const CH={app_card:"App",soundbox_cue:"Soundbox + app",none:"Not sent"};
+const STATUS={standard:"On time","SMA-0":"1–30 days late","SMA-1":"31–60 days late","SMA-2":"61–90 days late",NPA:"Over 90 days late"};
+const REQ={human_handoff:"Talk to a person",route_lower_deduction_request:"Smaller daily payment",route_reschedule_request:"New payment date"};
+const REQSTATUS={pending_lender_decision:"Waiting for the lender's decision",pending_lender_contact:"The lender will contact them"};
+const plain=k=>tech?k:(PLAIN[k]||k);
+const guardText=b=>tech?b:(GUARD[b.split(/[ :]/)[0]]||b);
+const hh=h=>h===12?"12 pm":h<12?`${h} am`:`${h-12} pm`;
+
 const T={
   en:{allow:"Allow",notnow:"Not now",withdraw:"Withdraw consent",offers:"View loan offers",offersNo:"Offers unavailable",
-      placeholder:"Reply in Hindi, English or Hinglish",quiet:"No messages from Pakka. Your instalments are on track.",
+      placeholder:"Reply in Hindi, English or Hinglish",quiet:"No messages from Pakka. Your loan payments are on track.",
       deferred:"Pakka has a message but will wait until",title:"Early-warning alerts for your loan",
       t1:"Early-warning alerts",t1s:"Tell me when a day's sales don't cover my instalment",
       t2:"Soundbox cue",t2s:"A neutral cue only. Never amounts or loan details",
       t3:"Loan offers",t3s:"Show me offers from lenders when I have no dues",
       off:"Alerts are off. Pakka won't contact you.",turnOn:"Turn on alerts",
-      hours:"Contact hours",hourss:"When Pakka may contact you. Never outside 08:00–19:00",hoursNow:"Pakka contacts you only between",
+      hours:"Contact hours",hourss:"When Pakka may contact you. Never outside 08:00–19:00",hoursNow:"Pakka messages you only from",reader:"Replies understood by",
       opt:{pay_today:"Pay now",pay_later:"Pay tomorrow",lower_deduction:"Lower deduction",reschedule:"New date",callback:"Call me",already_paid:"I already paid"},
       say:{pay_today:"I'll pay now",pay_later:"I'll pay tomorrow",lower_deduction:"Please reduce the daily deduction",reschedule:"Please reschedule my payment date",callback:"Please call me",already_paid:"I already paid"}},
   hi:{allow:"अनुमति दें",notnow:"अभी नहीं",withdraw:"सहमति वापस लें",offers:"लोन ऑफ़र देखें",offersNo:"ऑफ़र अभी उपलब्ध नहीं",
@@ -245,7 +276,7 @@ const T={
       t2:"Soundbox संकेत",t2s:"सिर्फ़ एक सामान्य संकेत। कभी रकम या लोन की बात नहीं",
       t3:"लोन ऑफ़र",t3s:"कोई बकाया न हो तब लोन देने वालों के ऑफ़र दिखाएँ",
       off:"अलर्ट बंद हैं। Pakka आपसे संपर्क नहीं करेगा।",turnOn:"अलर्ट चालू करें",
-      hours:"संपर्क का समय",hourss:"Pakka कब संपर्क कर सकता है। कभी भी 08:00–19:00 के बाहर नहीं",hoursNow:"Pakka आपसे सिर्फ़ इस समय संपर्क करता है:",
+      hours:"संपर्क का समय",hourss:"Pakka कब संपर्क कर सकता है। कभी भी 08:00–19:00 के बाहर नहीं",hoursNow:"Pakka आपसे सिर्फ़ इस समय संपर्क करता है:",reader:"जवाब समझता है",
       opt:{pay_today:"अभी भरूँगा",pay_later:"कल भरूँगा",lower_deduction:"कम कटौती",reschedule:"नई तारीख",callback:"कॉल करें",already_paid:"मैंने भर दिया"},
       say:{pay_today:"Abhi pay karta hoon",pay_later:"Kal de dunga",lower_deduction:"Thoda kam kato",reschedule:"Date aage badhao",callback:"Call karo",already_paid:"Maine already pay kiya"}}
 };
@@ -294,7 +325,7 @@ async function select(id){
   const p=P[id];
   const meta=await api("/merchant/personas");meta.personas.forEach(q=>P[q.merchant_id].day=q.day);
   setDay(P[id].day);
-  $("#story").innerHTML=`<b>${esc(p.title)}</b><span>${esc(p.story)}</span><span class="tag">${esc(p.lender)}</span><span class="tag">${p.shortfall_mode==="carry_forward_fifo"?"short days carried forward":"partial deductions held as prepayment"}</span><span class="tag">EDI ${rs(p.edi_paise)}/day</span><span class="tag">contact ${p.contact_window[0]}:00–${p.contact_window[1]}:00</span>`;
+  $("#story").innerHTML=`<b>${esc(p.title)}</b><span>${esc(p.story)}</span><span class="tag">${esc(p.lender)}</span><span class="tag">${p.shortfall_mode==="carry_forward_fifo"?"Short days: the rest is taken from later sales":"Short days: part-payments are held until a full payment"}</span><span class="tag">Daily loan payment ${rs(p.edi_paise)}</span><span class="tag">Messages only ${hh(p.contact_window[0])}–${hh(p.contact_window[1])}</span>`;
   $("#phName").textContent=p.display_name;$("#phLender").textContent=`Business app (demo) · loan from ${p.lender}`;
   $("#sbId").textContent=p.soundbox_id||"NO SOUNDBOX";
   $("#cue").textContent=p.soundbox_id?"Waiting…":"This merchant has no Soundbox. Alerts go to the app.";
@@ -313,7 +344,7 @@ function renderPhone(c){
   if(!c.active){
     $("#appView").style.display="none";const v=$("#consentView");v.style.display="";
     const prev=c.consent&&c.consent.withdrawn_at;
-    v.innerHTML=`<div class="eb" style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600">${prev?"Consent withdrawn":"Notice "+META.notice_version}</div>
+    v.innerHTML=`<div class="eb" style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600">${prev?"Permission withdrawn":"Permission request"}${tech?" · "+META.notice_version:""}</div>
       <h3>${t.title}</h3><ul>${notice(p).map(x=>`<li>${x}</li>`).join("")}</ul>
       ${[["ew",t.t1,t.t1s,1],["sb",t.t2,t.t2s,p.soundbox_id?1:0],["ro",t.t3,t.t3s,1]].map(([k,a,b,on])=>`<div class="tog"><div>${a}<small>${b}</small></div><label class="switch"><input type="checkbox" id="c_${k}" ${on?"checked":""} ${k==="sb"&&!p.soundbox_id?"disabled":""}><span></span></label></div>`).join("")}
       <div class="tog"><div>${t.hours}<small>${t.hourss}</small></div><div style="white-space:nowrap"><select id="c_from">${[8,9,10,11,12,13,14,15,16,17,18].map(h=>`<option ${h===8?"selected":""}>${h}</option>`).join("")}</select> – <select id="c_to">${[9,10,11,12,13,14,15,16,17,18,19].map(h=>`<option ${h===19?"selected":""}>${h}</option>`).join("")}</select></div></div>
@@ -324,20 +355,25 @@ function renderPhone(c){
   }
   $("#consentView").style.display="none";$("#appView").style.display="flex";
   const w=(c.consent&&c.consent.contact_window)||P[mid].contact_window;
-  $("#hours").textContent=`${t.hoursNow} ${String(w[0]).padStart(2,"0")}:00–${w[1]}:00`;
+  const cl=META.classifier||{mode:"keywords"};
+  const reader=tech?(cl.mode==="llm"?`${cl.provider} ${cl.model} + keyword fail-safe`:"offline keywords (fail-safe)")
+    :(cl.mode==="llm"?`${cl.provider[0].toUpperCase()+cl.provider.slice(1)} AI, double-checked by a safety word list`:"a built-in word list (works offline)");
+  $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="hi"?"–":" to "}${hh(w[1])} · ${t.reader}: ${reader}`;
   renderCard();
-  const ob=$("#offers");ob.disabled=!!offerBlocked;ob.textContent=offerBlocked?`${t.offersNo} (${offerBlocked})`:t.offers;
+  const ob=$("#offers");ob.disabled=!!offerBlocked;ob.textContent=offerBlocked?`${t.offersNo}${tech?" ("+offerBlocked+")":""}`:t.offers;
 }
 
 function renderCard(){
   const t=T[lang],el=$("#card");
   if(!last){el.className="card quiet";el.innerHTML=t.quiet;return}
   const r=last,msg=lang==="hi"?r.message_hi:r.message_en;
-  if(r.scheduled_for){el.className="card quiet";el.innerHTML=`${t.deferred} <b>${new Date(r.scheduled_for).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",hour12:false})}</b><div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(b)}</span>`).join("")}</div>`;return}
-  if(!msg){el.className="card quiet";el.innerHTML=t.quiet+(r.guard_blocks.length?`<div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(b)}</span>`).join("")}</div>`:"");return}
+  if(r.scheduled_for){el.className="card quiet";el.innerHTML=`${t.deferred} <b>${new Date(r.scheduled_for).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",hour12:false})}</b><div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(guardText(b))}</span>`).join("")}</div>`;return}
+  if(!msg){el.className="card quiet";el.innerHTML=t.quiet+(r.guard_blocks.length?`<div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(guardText(b))}</span>`).join("")}</div>`:"");return}
   el.className="card pakka"+(r.action==="human_handoff"?" handoff":"");
-  const chips=[...(r.rule_ids||[]).map(x=>["",x]),r.intent?["",`intent: ${r.intent} (${r.intent_source})`]:null,["",`action: ${r.action}`],["",r.template_id],
-    ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",b]),[r.policy_ok?"ok":"bad",r.policy_ok?"policy ok":"policy corrected"],r.lender_request_id?["ok",r.lender_request_id]:null,["",`${r.latency_ms} ms`]].filter(Boolean);
+  const chips=(tech?[...(r.rule_ids||[]).map(x=>["",x]),r.intent?["",`intent: ${r.intent} (${r.intent_source})`]:null,["",`action: ${r.action}`],["",r.template_id],
+    ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",b]),[r.policy_ok?"ok":"bad",r.policy_ok?"policy ok":"policy corrected"],r.lender_request_id?["ok",r.lender_request_id]:null,["",`${r.latency_ms} ms`]]
+    :[...(r.rule_ids||[]).map(x=>["",PLAIN[x]||x]),r.intent?["",`Understood: ${PLAIN[r.intent]||r.intent}`]:null,["",`Pakka: ${PLAIN[r.action]||r.action}`],
+    ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",guardText(b)]),r.lender_request_id?["ok","Sent to the lender"]:null]).filter(Boolean);
   el.innerHTML=`<div class="eb"><span>Pakka ✦</span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
     ${r.options.length?`<div class="opts">${r.options.map(o=>`<button data-opt="${o}">${t.opt[o]}</button>`).join("")}</div>`:""}
     <div class="chips">${chips.map(([k,c])=>`<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>`;
@@ -347,17 +383,18 @@ function renderCard(){
 async function grant(){
   let from=+$("#c_from").value,to=+$("#c_to").value;if(to<=from){from=8;to=19}
   const body={notice_version:META.notice_version,language:lang,early_warning_alerts:$("#c_ew").checked,soundbox_cue:$("#c_sb").checked,repeat_offers:$("#c_ro").checked,channel:"app",contact_window:[from,to]};
-  await post(`/merchant/${mid}/consent`,body);toast("Consent recorded with notice "+META.notice_version+". Withdraw any time.");await refresh();
+  await post(`/merchant/${mid}/consent`,body);toast("Permission saved. The shop owner can take it back any time.");await refresh();
 }
-async function withdraw(){await api(`/merchant/${mid}/consent`,{method:"DELETE"});last=null;toast("Consent withdrawn. Pakka will not contact this merchant.");await refresh()}
+async function withdraw(){await api(`/merchant/${mid}/consent`,{method:"DELETE"});last=null;toast("Permission taken back. Pakka won't message this shop.");await refresh()}
 
 async function runDay(){
   const day=+$("#day").value,now=$("#clock").value||"18:00";
   const out=await post(`/merchant/${mid}/simulate?day=${day}&now=${now}`);
   P[mid].day=day;const r=out.rescue,l=out.ledger_day;
-  if(!r.blocker){toast(`Day ${day}: deducted ${rs(l.deducted_paise)} of ${rs(l.edi_due_paise)}. No rule fired, nothing sent.`)}
-  else if(r.scheduled_for){toast(`Day ${day}: <b>${esc(r.rule_ids.join(", "))}</b> fired, but the guard deferred contact: ${esc(r.guard_blocks.join(", "))}`)}
-  else if(r.channel==="none"){toast(`Day ${day}: ${esc(r.blocker)} detected. Guard: ${esc(r.guard_blocks.join(", ")||"no contact")}`)}
+  const why=r.rule_ids.map(x=>tech?x:(PLAIN[x]||x)).join(", ");
+  if(!r.blocker){toast(`Day ${day}: ${rs(l.deducted_paise)} of the ${rs(l.edi_due_paise)} daily payment was taken from sales. All fine, no message sent.`)}
+  else if(r.scheduled_for){toast(`Day ${day}: <b>${esc(why)}</b>. Pakka will wait: ${esc(r.guard_blocks.map(guardText).join(", "))}`)}
+  else if(r.channel==="none"){toast(`Day ${day}: <b>${esc(plain(r.blocker))}</b>. No message: ${esc(r.guard_blocks.map(guardText).join(", ")||"nothing to send")}`)}
   if(r.blocker)last=r;
   if(r.channel==="soundbox_cue")playCue(r.soundbox_cue_text);
   await refresh();return r;
@@ -370,7 +407,7 @@ async function reply(text){
 }
 async function offers(){
   const r=await api(`/merchant/${mid}/offers`);
-  if(r.action==="show_repeat_offer"){last=r}else{offerBlocked=r.guard_blocks.join(", ")||"blocked";toast(`Offers blocked by the guard: <b>${esc(offerBlocked)}</b>`)}
+  if(r.action==="show_repeat_offer"){last=r}else{offerBlocked=r.guard_blocks.join(", ")||"blocked";toast(tech?`Offers blocked: <b>${esc(offerBlocked)}</b>`:r.guard_blocks.some(b=>b.startsWith("G1"))?"No loan offers: the shop owner didn't allow offers.":"No loan offers right now. Pakka won't offer a new loan while someone is behind or going through a hard time.")}
   await refresh();return r;
 }
 
@@ -385,29 +422,34 @@ function playCue(text){
 
 async function loadLedger(){
   const L=await api(`/merchant/${mid}/ledger`);
-  $("#ledgerH").textContent=`Lender ledger · ${L.lender} · ${L.shortfall_mode}`;
+  $("#ledgerH").textContent=tech?`Lender ledger · ${L.lender} · ${L.shortfall_mode}`:`Lender's payment record · ${L.lender}`;
   const cls={"standard":"","SMA-0":"s0","SMA-1":"s1","SMA-2":"s2","NPA":"npa"};
-  $("#ledgerTbl").innerHTML=`<table><tr><th>Day</th><th>Settlement</th><th>EDI</th><th>Deducted</th><th>Short today</th><th>Total due</th><th>Credit</th><th>DPD</th><th>SMA</th></tr>`+
-   L.rows.map((r,i)=>`<tr class="${i===L.rows.length-1?"now":r.shortfall_today_paise?"short":""}"><td>${i+1} · ${dateOf(i+1)}</td><td class="n">${rs(r.settlement_paise)}</td><td class="n">${rs(r.edi_due_paise)}</td><td class="n">${rs(r.deducted_paise)}</td><td class="n">${r.shortfall_today_paise?rs(r.shortfall_today_paise):"–"}</td><td class="n">${r.total_overdue_paise?rs(r.total_overdue_paise):"–"}</td><td class="n">${r.prepayment_credit_paise?rs(r.prepayment_credit_paise):"–"}</td><td class="n">${r.dpd}</td><td><span class="sma ${cls[r.sma_bucket]}">${r.sma_bucket}</span></td></tr>`).join("")+`</table>`;
+  $("#ledgerTbl").innerHTML=`<table><tr>${(tech?["Day","Settlement","EDI","Deducted","Short today","Total due","Credit","DPD","SMA"]:["Day","Sales","Daily payment","Taken","Short today","Total due","Held","Days late","Status"]).map(x=>`<th>${x}</th>`).join("")}</tr>`+
+   L.rows.map((r,i)=>`<tr class="${i===L.rows.length-1?"now":r.shortfall_today_paise?"short":""}"><td>${i+1} · ${dateOf(i+1)}</td><td class="n">${rs(r.settlement_paise)}</td><td class="n">${rs(r.edi_due_paise)}</td><td class="n">${rs(r.deducted_paise)}</td><td class="n">${r.shortfall_today_paise?rs(r.shortfall_today_paise):"–"}</td><td class="n">${r.total_overdue_paise?rs(r.total_overdue_paise):"–"}</td><td class="n">${r.prepayment_credit_paise?rs(r.prepayment_credit_paise):"–"}</td><td class="n">${r.dpd}</td><td><span class="sma ${cls[r.sma_bucket]}">${tech?r.sma_bucket:STATUS[r.sma_bucket]}</span></td></tr>`).join("")+`</table>`;
   const tb=$("#ledgerTbl");tb.scrollTop=tb.scrollHeight;
 }
 async function loadAudit(){
   const rows=await api(`/merchant/audit?merchant_id=${mid}&limit=40`);
-  $("#auditTbl").innerHTML=rows.length?`<table><tr><th>When</th><th>Rules / intent</th><th>Action</th><th>Guard</th></tr>`+rows.map(r=>`<tr><td>${esc(r.ts.slice(5,16).replace("T"," "))}</td><td>${esc((r.rule_ids.join(" ")||"")+(r.intent?` ${r.intent} (${r.intent_source})`:""))}</td><td>${esc(r.action)}<br><span class="muted">${esc(r.channel)}${r.consent_version?" · "+esc(r.consent_version):""}</span></td><td>${r.guard_blocks.map(b=>`<span class="chip ${b.startsWith("G6")?"bad":"warn"}">${esc(b)}</span>`).join(" ")||`<span class="chip ok">passed</span>`}</td></tr>`).join("")+`</table>`:`<p class="muted" style="padding:10px">Nothing yet. Every message, decision and guard result appears here.</p>`;
+  $("#auditTbl").innerHTML=rows.length?(tech?`<table><tr><th>When</th><th>Rules / intent</th><th>Action</th><th>Guard</th></tr>`:`<table><tr><th>When</th><th>Why</th><th>What Pakka did</th><th>Safety check</th></tr>`)+rows.map(r=>`<tr><td>${esc(r.ts.slice(5,16).replace("T"," "))}</td><td>${esc(tech?(r.rule_ids.join(" ")||"")+(r.intent?` ${r.intent} (${r.intent_source})`:""):[...r.rule_ids.map(x=>PLAIN[x]||x),r.intent?`Reply: ${PLAIN[r.intent]||r.intent}`:""].filter(Boolean).join(" · "))}</td><td>${esc(plain(r.action))}<br><span class="muted">${esc(tech?r.channel:CH[r.channel]||r.channel)}${tech&&r.consent_version?" · "+esc(r.consent_version):""}</span></td><td>${r.guard_blocks.map(b=>`<span class="chip ${b.startsWith("G6")?"bad":"warn"}">${esc(guardText(b))}</span>`).join(" ")||`<span class="chip ok">${tech?"passed":"OK"}</span>`}</td></tr>`).join("")+`</table>`:`<p class="muted" style="padding:10px">Nothing yet. Every message Pakka sends, and every safety check, appears here.</p>`;
   const h=$("#hist");
   h.innerHTML=rows.filter(r=>r.message&&r.channel!=="none").slice(1,6).map(r=>`<div><em>${esc(r.ts.slice(5,10))}</em> ${esc(r.message.slice(0,140))}${r.message.length>140?"…":""}</div>`).join("");
 }
 async function loadReqs(){
   const rows=await api("/merchant/lender/requests");
-  $("#reqs").innerHTML=rows.length?rows.slice(0,8).map(r=>`<div class="req"><b>${esc(r.request_id)}</b> · ${esc(P[r.merchant_id]?.display_name||r.merchant_id)}<br>${esc(r.kind.replaceAll("_"," "))} · <span class="chip warn">${esc(r.status.replaceAll("_"," "))}</span><br><span class="muted">“${esc(r.note.slice(0,90))}”</span></div>`).join(""):`<p class="muted">No requests yet. Pakka routes requests here; the lender decides.</p>`;
+  $("#reqs").innerHTML=rows.length?rows.slice(0,8).map(r=>`<div class="req"><b>${esc(P[r.merchant_id]?.display_name||r.merchant_id)}</b>${tech?" · "+esc(r.request_id):""}<br>${esc(tech?r.kind:REQ[r.kind]||r.kind)} · <span class="chip warn">${esc(tech?r.status:REQSTATUS[r.status]||r.status)}</span><br><span class="muted">“${esc(r.note.slice(0,90))}”</span></div>`).join(""):`<p class="muted">No requests yet. When a shop asks for something, it appears here, and the lender decides.</p>`;
 }
 async function loadDash(){
   const d=await api("/merchant/dashboard");
-  const tiles=[["Flagged",d.flagged],["Contacted",d.contacted],["Cured ≤ 1 day",d.cured_within_1_day],["Handoffs",d.handoffs],["Routed requests",d.routed_requests],["Guard violations",d.guard_violations,d.guard_violations?"bad":"good"]];
+  const N=tech?["Flagged","Contacted","Cured ≤ 1 day","Handoffs","Routed requests","Guard violations"]:["Shops with a problem","Shops messaged","Caught up within a day","Passed to a person","Requests sent to lender","Safety rules broken"];
+  const tiles=[[N[0],d.flagged],[N[1],d.contacted],[N[2],d.cured_within_1_day],[N[3],d.handoffs],[N[4],d.routed_requests],[N[5],d.guard_violations,d.guard_violations?"bad":"good"]];
   $("#tiles").innerHTML=tiles.map(([a,b,c])=>`<div class="tile ${c||""}"><b>${b}</b><span>${a}</span></div>`).join("");
   const e=d.eval;
-  $("#evalLine").innerHTML=(Object.keys(d.guard_blocks).length?`Guard blocks so far: ${Object.entries(d.guard_blocks).map(([k,v])=>`${esc(k)} ×${v}`).join(", ")}. `:"")+
-    (e?`Eval on ${e.merchants} synthetic merchants: <b>${e.guard_violations} guard violations</b> in ${e.rescues} rescues, R1 recall ${e.detection.r1_recall}, distress handoff ${e.distress_handoff_rate*100}%, p95 ${e.latency.p95_ms} ms.`:"Run python eval/merchant_eval.py to add eval results here.");
+  const held=Object.values(d.guard_blocks).reduce((a,b)=>a+b,0);
+  $("#evalLine").innerHTML=tech?
+    (Object.keys(d.guard_blocks).length?`Guard blocks so far: ${Object.entries(d.guard_blocks).map(([k,v])=>`${esc(k)} ×${v}`).join(", ")}. `:"")+
+    (e?`Eval on ${e.merchants} synthetic merchants: <b>${e.guard_violations} guard violations</b> in ${e.rescues} rescues, R1 recall ${e.detection.r1_recall}, distress handoff ${e.distress_handoff_rate*100}%, p95 ${e.latency.p95_ms} ms.`:"Run python eval/merchant_eval.py to add eval results here.")
+    :(held?`Safety checks have held back or changed ${held} message${held>1?"s":""} so far. `:"")+
+    (e?`Tested on ${e.merchants} practice shops over 30 days: <b>${e.guard_violations} safety rules broken</b>, and every hardship or dispute reply reached a person.`:"");
 }
 
 // controls
@@ -417,6 +459,7 @@ $("#run").onclick=runDay;$("#next").onclick=nextDay;
 $("#send").onclick=()=>reply();$("#replyText").onkeydown=e=>{if(e.key==="Enter")reply()};
 $("#offers").onclick=offers;$("#withdraw").onclick=withdraw;
 $("#replay").onclick=()=>playCue(lastCue);
+$("#tech").onchange=async e=>{tech=e.target.checked;await refresh()};
 $("#reset").onclick=async()=>{await post("/merchant/reset");last=null;offerBlocked=null;lastCue=null;toast("Demo reset.");await select(mid)};
 document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{lang=b.dataset.lang;document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x===b));await refresh()});
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -434,27 +477,27 @@ async function tour(){
   const allow=async()=>{await sleep(300);if($("#allow"))await grant()};
   const go=async(id,day,time="18:00")=>{if(mid!==id)await select(id);setDay(day);$("#clock").value=time};
   const S=[
-    ["Pakka for Merchants watches the lender's daily ledger for shop owners repaying through daily deductions from their sales.",null,async()=>{await post("/merchant/reset");await select("kirana_steady")}],
-    ["A steady kirana store gives consent. We run five days of sales. Sales cover the instalment every day, so Pakka stays silent.","#ledgerPanel",async()=>{await allow();for(let d=1;d<=5;d++){setDay(d);await runDay()}}],
-    ["A chai stall owner sees the consent notice first: who, why, what data, how to withdraw, and the grievance officer.","#phone",async()=>{await select("chai_seasonal")}],
-    ["They allow alerts and the neutral Soundbox cue. Consent is versioned and timestamped.","#phone",allow],
-    ["Day 10: rain, and sales fall short of the ₹600 instalment. The Soundbox plays only a neutral cue. No amounts are spoken.","#soundbox",()=>go("chai_seasonal",10).then(runDay)],
-    ["The app card shows the lender's own figures and the options. The rule IDs explain why Pakka spoke.","#card",null],
-    ["They reply \"Kal de dunga\". It's classified as will_pay_later, so a reminder is set inside contact hours, with a pay link to the lender.","#card",()=>reply("Kal de dunga")],
-    ["Day 11: sales recover and the lender's sweep clears the dues. Pakka says thank you, and attaches no offer.","#card",nextDay],
-    ["A general store's shortfall is detected at 21:30. The G2 guard defers contact to 08:00.","#auditPanel",async()=>{await go("general_late_night",6,"21:30");await allow();await runDay()}],
-    ["A tailor falls ill and sales collapse. On day 15 Pakka sends a nudge.","#card",async()=>{await go("tailor_stress",15);await allow();await runDay()}],
-    ["They reply \"Bimar tha, dukaan band thi\". That's hardship, so Pakka stops and hands off to a person at the lender, with the grievance officer.","#card",()=>reply("Bimar tha, dukaan band thi")],
-    ["They tap loan offers. G4 blocks any new credit while dues exist or within 90 days of stress.","#offers",offers],
-    ["The lender sees routed requests waiting for its decision. Pakka never decides.","#reqPanel",null],
-    ["Every message and guard result is audited. Guard violations: 0.","#dash",null],
+    ["Many shop owners repay a loan a little every day, straight from their sales. Pakka watches for days when that payment falls short.",null,async()=>{await post("/merchant/reset");await select("kirana_steady")}],
+    ["A kirana store says yes to alerts. Five days pass, sales cover the payment every day, so Pakka stays quiet.","#ledgerPanel",async()=>{await allow();for(let d=1;d<=5;d++){setDay(d);await runDay()}}],
+    ["A chai stall owner is asked first: who will message them, why, what data is used, and how to say no later.","#phone",async()=>{await select("chai_seasonal")}],
+    ["They say yes. Their choice is saved, and they can take it back with one tap.","#phone",allow],
+    ["Day 10: it rains and sales fall short of the ₹600 daily payment. The Soundbox only says 'check your app'. No amounts out loud.","#soundbox",()=>go("chai_seasonal",10).then(runDay)],
+    ["The app shows what's short, using the lender's own figures, and simple choices.","#card",null],
+    ["They reply \"Kal de dunga\" (I'll pay tomorrow). Pakka sets a reminder for the morning and sends a pay link to the lender.","#card",()=>reply("Kal de dunga")],
+    ["Day 11: sales are back and the payment is caught up. Pakka says thank you, and doesn't push another loan.","#card",nextDay],
+    ["A general store falls short late at night. Pakka waits until 8 am to message them.","#auditPanel",async()=>{await go("general_late_night",6,"21:30");await allow();await runDay()}],
+    ["A tailor falls ill and sales stop. On day 15 Pakka sends a gentle warning.","#card",async()=>{await go("tailor_stress",15);await allow();await runDay()}],
+    ["They reply \"Bimar tha, dukaan band thi\" (I was ill, the shop was shut). Pakka stops the reminders and brings in a person from the lender.","#card",()=>reply("Bimar tha, dukaan band thi")],
+    ["They tap loan offers. Pakka won't offer a new loan to someone who is struggling.","#offers",offers],
+    ["The lender sees every request and decides. Pakka never decides anything about the loan.","#reqPanel",null],
+    ["Everything Pakka did is written down. Safety rules broken: 0.","#dash",null],
   ];
   await sleep(800);
   for(let i=0;i<S.length;i++){
     const[t,target,act]=S[i];cap.querySelector(".n").textContent=`Step ${i+1} of ${S.length}`;cap.querySelector(".t").textContent=t;cap.querySelector(".prog i").style.width=`${(i+1)/S.length*100}%`;
     if(act)await act();await sleep(500);focus(target);await sleep(4200);
   }
-  focus(null);cap.querySelector(".n").textContent="That's the loop";cap.querySelector(".t").textContent="Spot the shortfall, tell them safely, route requests to the lender, and stop for a person when it's hard. The same engine powers the loan-application rescue at /demo.";
+  focus(null);cap.querySelector(".n").textContent="That's the loop";cap.querySelector(".t").textContent="Spot the short day, tell them kindly and privately, let the lender decide, and bring in a person when life is hard.";
 }
 
 init().then(()=>{if(new URLSearchParams(location.search).has("tour"))tour()});

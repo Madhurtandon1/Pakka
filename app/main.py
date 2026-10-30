@@ -86,6 +86,18 @@ async def doccheck(file: UploadFile = File(...)):
     return check_image(data)
 
 
+@app.get("/samples/{kind}")
+def sample_document(kind: str):
+    """Demo files for the upload step: the real photo check judges them like any upload."""
+    from pakka.samples import make_sample
+    try:
+        data, media, name = make_sample(kind)
+    except KeyError:
+        raise HTTPException(404, "unknown sample")
+    return Response(data, media_type=media, headers={"Content-Disposition": f'inline; filename="{name}"',
+                                                     "Cache-Control": "max-age=3600"})
+
+
 @app.get("/kfs/{term}")
 def kfs(term: str, lang: str = "en"):
     text = kfs_term(term, lang)

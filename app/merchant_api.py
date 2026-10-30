@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from pakka import sarvam
-from pakka.merchant import policy
+from pakka.merchant import intents, policy
 from pakka.merchant.agent import Desk
 from pakka.merchant.guard import effective_window, in_window
 from pakka.merchant.models import ConsentIn
@@ -67,7 +67,14 @@ def list_personas():
             "preferred_window": (desk.store.consent(mid).contact_window if desk.store.consent(mid) else None),
         })
     return {"personas": out, "days": DAYS, "notice_version": policy.notice_version(),
-            "soundbox_cues": SOUNDBOX_CUE, "thresholds": THRESHOLDS}
+            "soundbox_cues": SOUNDBOX_CUE, "thresholds": THRESHOLDS, "classifier": classifier()}
+
+
+def classifier() -> dict:
+    """Which reader is labelling merchant replies right now. The fail-safe applies either way."""
+    if intents.llm_enabled():
+        return {"mode": "llm", "provider": intents.llm_provider(), "model": intents.llm_model()}
+    return {"mode": "keywords", "provider": None, "model": None}
 
 
 @router.post("/reset")

@@ -1,55 +1,63 @@
 # Pakka ✦ — Hackathon Presentation Guide
 
 **Team Queen** · Samina Parveen · Madhur Tandon · Aditya Karn
-**Paytm Build for India AI Hackathon (Delhi)** · Track 2: AI-Powered Financial Journeys
+**Paytm Build for India AI Hackathon (Delhi, 31 Oct 2026)** · Track 2: AI-Powered Financial Journeys
 
-> **One line:** Pakka spots when someone is stuck in a loan application, tells them what went wrong in their own language, and helps them fix it. If it can't, it hands them to a person.
+> **One line:** Pakka notices when someone is stuck or slipping in a financial journey, tells them what's wrong in their own language, offers a fix they agree to, and hands them to a person when it can't help. It never decides anything about the loan.
 
 ```
 spot it  →  explain it  →  fix it (with consent)  →  check it worked  →  hand off to a person if not
 ```
 
+**One engine, two journeys:**
+
+| Journey | Who it helps | Live demo |
+|---|---|---|
+| **A. Loan application rescue** | People stuck while applying for a personal loan: KYC photo failures, face check, DigiLocker, confusing loan terms, timeouts | `/demo` (`/demo?tour=1` plays itself) |
+| **B. Pakka for Merchants** | Shop owners repaying a merchant loan through daily deductions from their sales (EDI), who fall short on a slow day | `/merchant` (`/merchant?tour=1` plays itself) |
+
+> Prototype on synthetic data only. Not connected to Paytm or any lender.
+
 ---
 
 ## 1. The problem
 
-- Digital loan journeys lose people at small, fixable steps: a blurry Aadhaar photo, the wrong file type, a face check that fails in bad light, no DigiLocker account, or loan terms (APR, foreclosure, penal charges) the user doesn't understand.
-- Today the app usually just says **"Try again."** A first-time borrower can read that as a **no** and give up.
-- Hindi-first and first-time users are hit hardest. The Key Fact Statement (KFS) is full of jargon, and the error messages don't say *what* went wrong.
+**Loan applications are lost at small, fixable steps.** A blurry Aadhaar photo, the wrong file type, a face check that fails in poor light, no DigiLocker account, or Key Fact Statement (KFS) terms like APR, foreclosure and penal charges that the applicant doesn't understand. The app usually just says *"Try again"*, and a first-time borrower can read that as a *no*.
 
-**Our mission line:** *"No one should give up on a loan over a blurry photo."*
+**Merchants fall behind without warning.** Merchant loans are repaid by **daily auto-deduction from sales settlements (EDI)**. On a slow day, such as rain, illness or a festival closure, the deduction falls short. The merchant often finds out only after a charge or a credit-score impact, through generic reminders that don't explain anything, can't be answered, and sometimes play out loud on a shared Soundbox in front of customers.
 
-## 2. Our solution: Pakka
+**Mission line:** *"No one should give up on a loan over a blurry photo, or fall behind on one without a fair warning."*
 
-Pakka is a **proactive rescue agent** that sits inside the loan journey:
+---
 
-1. **Spot it.** It watches app events and notices a stall without the user asking.
-2. **Explain it.** It says what went wrong in **English or Hindi**, in writing or **out loud** (Sarvam Bulbul TTS).
-3. **Fix it, with consent.** It offers a fix from a fixed **approved list**: guided photo retake, file conversion, video KYC, DigiLocker help, KFS explainer, resume link, callback.
-4. **Hand off.** On the third attempt, or if an action isn't allowed, a **person takes over** and sees the full history, so the user doesn't have to repeat anything.
-5. **Audit.** Every intervention is written to an audit log.
+## 2. What Pakka is, and the principles that make it safe
 
-### Who it helps (illustrative personas)
-
-| Situation | What Pakka does |
+| Principle | What it means in the code |
 |---|---|
-| First-time borrower: "My Aadhaar photo failed twice. The app just said try again." | Says what went wrong (corner cut off, blur, glare) and guides a retake |
-| Hindi-first applicant: "APR, foreclosure, penal charges. I don't know what I'm agreeing to." | Explains all 6 KFS terms in Hindi |
-| Shop owner on a busy day: "A customer walked in and I lost my place." | After 10 minutes idle, sends a resume link |
-| Stuck at the face check: "It keeps failing in my room's light." | Gives tips first, then offers video KYC |
-| Not on DigiLocker: "I've never used it. Now I can't get past this step." | Helps set it up, or switches to video KYC |
+| **Rules decide, never a language model** | Rules detect the problem, a policy lists the only actions allowed, and a guard checks every action before anything happens |
+| **The AI only labels** | In the merchant journey an LLM may label a reply as one of 9 fixed intents. It never picks an action and never writes text the user sees |
+| **Fail safe** | When unsure, Pakka routes to a person, never to a payment nudge |
+| **Reviewed templates only** | Everything the user reads or hears is a reviewed English or Hindi template, so nothing is made up |
+| **Consent first** | Actions that need consent wait for a "yes"; the merchant journey has versioned, granular, revocable consent |
+| **No loan decisions** | Pakka never approves, rejects, waives, reschedules or calculates dues. It routes requests to the lender, which decides |
+| **Privacy** | Aadhaar, PAN, phone and email are masked before any text leaves the server |
+| **Everything audited** | Every message, decision and guard result is logged |
 
 ### Why it isn't "just a chatbot"
 
 | | Typical chatbot | Pakka |
 |---|---|---|
-| Who starts it | The user has to ask | Pakka steps in on its own when it sees a stall |
-| Who decides the action | A language model | **Rules**, then a **policy guard** against an approved list |
-| What the user hears | Generated text, which can be made up | **Reviewed templates**, so nothing is made up |
-| Loan decisions | Unclear | **Never.** None of the 9 actions approve or reject a loan |
-| Dead ends | Can loop forever | Third attempt → a person |
+| Who starts it | The user has to ask | Pakka notices a stall or shortfall itself |
+| Who decides the action | A language model | Rules, checked by a guard against an approved list |
+| What the user hears | Generated text, which can be made up | Reviewed templates |
+| Loan decisions | Unclear | Never |
+| When it can't help | Can loop forever | A person takes over |
 
-**Design principle:** the language model is deliberately kept **out of the decision**. Rules pick the action, the guard checks it, and only then is the explanation written.
+### Positioning: the *how*, not the *whether*
+
+Paytm's Q2 FY26 release already describes AI models that predict merchant churn and delinquency, "enabling proactive engagement and collections efforts". **Don't claim Paytm lacks proactive engagement.** Say:
+
+> "You already predict delinquency and engage proactively. Pakka is the layer that makes that engagement consented, private on a shared Soundbox, scripted by the lender, guarded against upsell and pressure, and auditable: the shape the January 2027 recovery rules and the May 2027 data-protection rules will require."
 
 ---
 
@@ -59,89 +67,76 @@ Pakka is a **proactive rescue agent** that sits inside the loan journey:
 
 ```mermaid
 flowchart LR
-  A[App events] --> B[Stall detector<br/>rules]
-  B -->|stalled| C[Pick action<br/>approved list]
-  C --> D[Guard<br/>policy check]
-  D --> E[Explain<br/>EN / HI]
-  E --> F[User consents]
-  F --> G[Audit log]
-  D -->|not allowed or 3rd attempt| H[Hand off to a person]
+  subgraph A[Journey A: loan application]
+    A1[App events] --> A2[Stall detector<br/>6 blockers] --> A3[Pick action<br/>approved list] --> A4[Guard] --> A5[Explain EN/HI] --> A6[Consent]
+    A4 -->|not allowed or 3rd attempt| AH[Person]
+  end
+  subgraph B[Journey B: merchants]
+    B1[Lender ledger] --> B2[Rules R1–R4] --> B3[Pick action] --> B4[Guards G1–G9] --> B5[Template EN/HI<br/>+ neutral Soundbox cue]
+    B6[Merchant reply] --> B7[Intent: keywords<br/>+ optional LLM] --> B3
+    B4 -->|distress, 3rd attempt, out of scope| BH[Person at the lender]
+  end
+  A6 --> L[(Audit log)]
+  B5 --> L
 ```
 
 ### Tech stack
 
 | Layer | Tech |
 |---|---|
-| API / server | **FastAPI** + Uvicorn (Python 3.11) |
-| Agent orchestration | **LangGraph** state graph |
-| Data models | **Pydantic v2** |
-| Photo quality check | **OpenCV** + NumPy |
-| Voice | **Sarvam AI Bulbul** text-to-speech (falls back to browser speech) |
-| Storage / audit | **SQLite** (Postgres planned) |
-| Frontend | Plain HTML/CSS/JS: landing page and live demo page |
-| Quality | **pytest** (25 tests), eval scripts, **GitHub Actions CI**, **Docker** |
+| API / server | FastAPI + Uvicorn (Python 3.11+) |
+| Agents | LangGraph state graphs (one per journey) |
+| Data models | Pydantic v2; money stored as integer paise |
+| Photo check | OpenCV + NumPy |
+| Voice | Sarvam Bulbul TTS (falls back to the browser's voice) |
+| Optional reply labelling | Sarvam `sarvam-105b`, Google Gemini, or Anthropic Claude Haiku. All optional; offline keywords by default |
+| Storage | SQLite (Postgres planned) |
+| Frontend | Plain HTML/CSS/JS: landing page, loan demo, merchant demo |
+| Quality | 154 pytest tests, 4 eval scripts, GitHub Actions CI, Docker |
 
 ### Repository map
 
 ```
-pakka/
-  models.py      Event / Detection / Rescue data models
-  detector.py    Rule-based stall detector (6 blockers)
-  policy.json    Approved actions per blocker + consent flags
-  policy.py      choose() / check() guard / needs_consent()
-  agent.py       LangGraph agent: detect → decide → guard → explain
-  explain.py     EN + HI templates, photo reasons, 6 KFS terms
-  doccheck.py    OpenCV blur / glare / cut-off-card check
-  pii.py         Masks Aadhaar, PAN, phone, email
-  sarvam.py      Sarvam Bulbul TTS client (masks PII first)
-  store.py       SQLite event store + audit log
-  synth.py       Synthetic journey generator
+pakka/                      Journey A + shared code
+  detector.py  policy.json  policy.py  agent.py  explain.py  doccheck.py
+  pii.py  sarvam.py  store.py  synth.py  models.py
+pakka/merchant/             Journey B
+  models.py     ledger.py   rules.py    policy.json  policy.py   guard.py
+  intents.py    templates.py agent.py   store.py     synth.py
 app/
-  main.py        FastAPI endpoints
-  static/index.html  Landing page (mission, how it works, FAQ, help)
-  static/demo.html   Live demo loan journey + guided tour
+  main.py  merchant_api.py
+  static/index.html  demo.html  merchant.html
 eval/
-  run_eval.py    Main evaluation (500 journeys, 30 scenarios)
-  holdout.py     Held-out test (260 journeys, 13 unseen patterns)
-  make_scenarios.py  Builds the 30 scripted scenarios
-tests/           25 pytest tests
-Dockerfile, .github/workflows/ci.yml
+  run_eval.py  holdout.py           Journey A evaluations
+  merchant_eval.py                  Journey B guard evaluation (CI-gated)
+  intent_holdout.py                 Blind test of the reply classifier
+tests/                              154 tests
+Dockerfile  .dockerignore  .github/workflows/ci.yml
 ```
 
 ---
 
-## 4. How each piece works
+## 4. Journey A: loan application rescue (`/demo`)
 
-### 4.1 Events: the input ([pakka/models.py](pakka/models.py))
+### How it works
 
-Every tap in the loan journey sends an event:
-
-- **Steps:** `basic → kyc → offer → bank → review`
-- **Event types:** `step_view`, `upload_ok`, `upload_failed`, `liveness_failed`, `digilocker_error`, `kfs_open`, `back`, `session_expired`, `submit`
-- Each event has a timestamp and an optional error code (`IMG_CROPPED`, `IMG_BLUR`, `IMG_GLARE`, `FILE_FORMAT`, `NOT_REGISTERED`, …).
-
-### 4.2 Stall detector ([pakka/detector.py](pakka/detector.py))
-
-The detector is rule-based and explainable: every detection comes with the **reasons** it was chosen.
+1. **Events in.** Every tap sends an event: `step_view`, `upload_failed`, `liveness_failed`, `digilocker_error`, `kfs_open`, `back`, `session_expired`, `submit`. The steps are `basic → kyc → offer → bank → review`.
+2. **Stall detector** (rules, with reasons attached):
 
 | Blocker | Rule |
 |---|---|
-| `timeout` | Session expired, or **10 minutes** (600s) with no progress on any step |
-| `bad_photo` | At KYC: **2+ failed uploads** since the last success, or 1 failure plus **90s idle** |
-| `wrong_format` | Same as above, but the most common error code is `FILE_FORMAT` |
-| `liveness` | **2+ failed face checks** at KYC |
-| `digilocker` | DigiLocker error `NOT_REGISTERED` |
-| `offer_jargon` | On the offer screen: opened the KFS and then **90s idle**, or pressed **back twice** |
+| `bad_photo` | At KYC: 2+ failed uploads since the last success, or 1 failure + 90 s idle |
+| `wrong_format` | Same, but the most common error is `FILE_FORMAT` |
+| `liveness` | 2+ failed face checks |
+| `digilocker` | `NOT_REGISTERED` error |
+| `offer_jargon` | KFS opened + 90 s idle, or pressed back twice on the offer |
+| `timeout` | Session expired, or 10 minutes with no progress |
 
-Details that matter:
-- A `submit` event means no stall.
-- Failures are only counted **after the last successful upload**. One failure followed by a success is not a stall, so there are no false alarms for people who fix it themselves.
+   One failure followed by a success is **not** a stall, so people who fix it themselves are left alone.
 
-### 4.3 Approved-action policy ([pakka/policy.json](pakka/policy.json), [pakka/policy.py](pakka/policy.py))
+3. **Approved actions** (9 in total, tried in order; the third attempt goes to a person):
 
-The agent can **only** pick from this list. Each new attempt moves one step down the list:
-
-| Blocker | Attempt 1 → 2 → 3 … |
+| Blocker | Attempt 1 → 2 → 3 |
 |---|---|
 | bad_photo | guided_recapture → human_handoff |
 | wrong_format | convert_file → guided_recapture → human_handoff |
@@ -150,234 +145,233 @@ The agent can **only** pick from this list. Each new attempt moves one step down
 | offer_jargon | explain_kfs → schedule_callback → human_handoff |
 | timeout | send_resume_link → schedule_callback |
 
-- **9 actions in total.** Each has a `needs_consent` flag. Retakes, file conversion, video KYC, callbacks and handoff need a **"yes"** from the user. Tips, the KFS explainer and the resume link don't.
-- `max_attempts_before_handoff = 3`: after 3 attempts the case always goes to a person (if handoff is allowed for that blocker).
-- `check()` raises a `PolicyViolation` if an action isn't approved for that blocker.
+4. **Guard node:** any action not on the list for that blocker is overridden to a person.
+5. **Explain:** English or Hindi templates with the specific reason ("a corner of the card was cut off" / "कार्ड का एक कोना कट जाने"). The **KFS explainer** covers APR, EMI, processing fee, cooling-off period, penal charges and foreclosure, in both languages.
+6. **OpenCV photo check:** blur (variance of the Laplacian < 60), glare (> 6% near-white pixels), cut-off card (the card's outline touches the frame edge), and unreadable files. It returns the same codes the detector uses.
+7. **Voice:** Sarvam Bulbul reads messages aloud (PII masked first), or the browser's voice is used.
+8. **Audit:** every intervention is logged. The attempt count comes from the audit log.
 
-### 4.4 The LangGraph agent ([pakka/agent.py](pakka/agent.py))
+### Results (synthetic data)
 
-The agent is a 4-node state graph:
+| Check | Result |
+|---|---|
+| Hand-written scenarios | **30 / 30** |
+| Actions checked against the approved list | **2,000, 0 violations** |
+| KFS terms explained in EN + HI | 6 / 6 |
+| **Held-out test:** 260 journeys from 13 patterns written after the rules | **0.85 accuracy, 0% false alarms**, 11% of stuck users missed |
+| Agent latency | ~1.1 ms p50 |
 
-```
-detect ──(not stalled)──► END
-   │
-   └─(stalled)─► decide ─► guard ─► explain ─► END
-```
+**Known misses, left visible:** (1) a single failed face check followed by a long pause; (2) two failed uploads followed by a 10+ minute walk-away, which is labelled a timeout. The 1.00 on our own 500 synthetic journeys only shows the rules do what we wrote, so we don't headline it.
 
-- **detect:** runs the rule detector
-- **decide:** `policy.choose(blocker, attempts)`
-- **guard:** `policy.check()`. If it fails, the action is **overridden to `human_handoff`** and marked escalated.
-- **explain:** fills in the template in the chosen language
+---
 
-It returns a `Rescue` object with the detection, action, message, `needs_consent`, `escalated`, `policy_ok` and `latency_ms`. It takes **about 1 ms** and makes no network calls.
+## 5. Journey B: Pakka for Merchants (`/merchant`)
 
-### 4.5 Explanations in English and Hindi ([pakka/explain.py](pakka/explain.py))
+### How it works
 
-- Every action has a reviewed **English and Hindi** template.
-- Photo failures say the specific reason: *"a corner of the card was cut off"* / *"कार्ड का एक कोना कट जाने"*.
-- The **KFS explainer** covers 6 terms in both languages: **APR, EMI, processing fee, cooling-off period, penal charges, foreclosure**.
-- The resume link names the step where the application is saved.
+1. **Lender ledger (the only source of figures).** For each day: settlement, EDI due, amount deducted, shortfall, total due, days past due (DPD) and the RBI bucket (SMA-0 = 1–30 DPD, SMA-1 = 31–60, SMA-2 = 61–90, then NPA). How a short day is handled is **lender configuration**:
+   - *carry-forward:* the shortfall is swept from later sales, oldest instalment first;
+   - *prepayment credit:* partial deductions are held until they cover a whole instalment.
+   Pakka never computes dues or penalties.
 
-### 4.6 Photo check with OpenCV ([pakka/doccheck.py](pakka/doccheck.py))
+2. **Rules** (each has an ID that goes into the audit log):
 
-A real image-quality check that runs on any uploaded ID photo:
+| Rule | Fires when |
+|---|---|
+| R1 shortfall | Today's deduction was less than the EDI |
+| R2 arrears ageing | DPD ≥ 1 and the merchant hasn't been contacted about this unpaid date |
+| R3 early warning | 7-day average sales < 1.2 × EDI while nothing is overdue (at most once a week) |
+| R4 cured | Previously overdue, now fully paid: a thank-you, and **no offer attached** |
 
-| Check | Method | Threshold |
+3. **Neutral Soundbox cue + app card.** The Soundbox only ever says *"You have an important message in your Paytm for Business app"* (or the Hindi equivalent): never an amount, never "overdue", never the word "loan". The app card shows the lender's own figures in English or Hindi, with buttons: pay now, pay tomorrow, lower deduction, new date, call me, I already paid.
+
+4. **The merchant replies** in Hindi, Hinglish or English, typed or spoken (the mic uses the browser's speech recognition). The reply is labelled as one of **9 intents**, and **rules** pick the response:
+
+| Intent | Action |
+|---|---|
+| will pay today | UPI link to the **lender's** account: just today's shortfall, or the total due |
+| will pay later | Reminder inside contact hours, plus the pay link |
+| lower deduction / new date | Request **routed to the lender** as `pending_lender_decision`. Pakka never promises an outcome |
+| call me / unclear | Callback from the lender's team |
+| hardship / dispute / already paid | **Handoff to a person** at the lender, with the grievance officer's name and free debt counselling. Contact for that episode stops |
+
+5. **Lender view:** the ledger table with SMA badges, routed requests, the audit log with guard-block chips, and a dashboard whose **guard violations** tile re-checks every audit row live.
+
+### The nine guards (every one tested, and re-checked by the eval)
+
+| Guard | Rule |
+|---|---|
+| G1 consent | No contact without active, versioned consent; loan offers need their own consent. **A merchant's own distress reply always reaches a person, even without consent** |
+| G2 hours | Proactive contact only within the **merchant's chosen hours**, never wider than 08:00–19:00; otherwise deferred |
+| G3 cadence | At most one proactive contact a day; during a shortfall, **every other day** unless the SMA bucket worsens |
+| G4 no upsell | No loan offer while dues exist, or within 90 days of a stress flag |
+| G5 Soundbox safe | Only the exact neutral cue: no digits, no money or loan words |
+| G6 lender scope | An action the lender hasn't enabled goes to a person |
+| G7 attempts | The third attempt in an episode goes to a person |
+| G8 distress | Hardship (including illness, bereavement, weddings, flood and other calamities), dispute or "already paid" → person, and contact stops |
+| G9 no decisions | Approve, waive, reschedule and similar actions are impossible (raises an error; tested) |
+
+### Consent, done properly
+
+- **Bilingual notice:** who (Paytm as lending service provider for the named lender), why, which data (settlement totals only), who gets what, how long it's kept, how to withdraw, and the grievance officer.
+- **Separate toggles:** alerts, Soundbox cue, loan offers, plus the merchant's contact hours.
+- **Records:** every grant is versioned (`merchant-ews-v1`) and timestamped. Withdrawing is one tap, and the full history is kept.
+
+### The reply classifier: fail safe by design
+
+- **Offline keywords (the default):** Devanagari, romanised Hindi and English.
+  - Distress words are checked first.
+  - A negation together with a money or sales word ("पैसे नहीं", "bikri nahi") counts as hardship.
+  - A **"will pay" label needs a time word, a payment verb and no negation**; otherwise the reply is `unclear`, which goes to a person.
+- **Optional LLM** (`PAKKA_LLM_PROVIDER` = `sarvam`, `gemini` or `anthropic`):
+  - It sees only PII-masked text and a fixed list of 9 labels, and anything else becomes `unclear`.
+  - Any error, timeout or rate limit falls back to keywords.
+  - Replies the keywords already flag as distress go straight to a person, without asking the LLM.
+- **Combining the two:**
+  1. Distress from either source wins.
+  2. `unclear` from either source is an abstain, so the other label is used.
+  3. Every "will pay" label, from either source, must pass the fail-safe.
+  4. Two confident but different labels go to a person.
+
+### Demo merchants
+
+| Merchant | Story | What it shows |
 |---|---|---|
-| **Blur** | Variance of the Laplacian (sharpness) | < 60 → `IMG_BLUR` |
-| **Glare** | Share of near-white pixels (≥250) | > 6% → `IMG_GLARE` |
-| **Cut-off card** | Otsu threshold → morphological close → largest contour → does its bounding box touch the frame edge (2% margin)? | → `IMG_CROPPED` |
-| **Not an image** | OpenCV can't decode it | → `FILE_FORMAT` |
+| Sharma Kirana (steady) | Sales always cover the EDI | No false alarms; offers allowed |
+| Ramesh Chai Stall (rain) | Day 10 short, day 11 recovers | Soundbox cue → "Kal de dunga" → reminder moved to 08:00 → cured, no offer |
+| Noor Tailors (illness) | Slow week, then sales collapse | Early warning on day 14; hardship → person; offers blocked |
+| City Mobile Repair (dispute) | Lender holds ₹400 as prepayment, shows ₹600 due | "Already paid" → person; lower-deduction request outside lender scope → person |
+| Gupta General Store (late night) | Short day detected at 21:30 | Contact deferred to 08:00 |
 
-The codes it returns are the same ones the detector and the explanation templates use, so the whole loop is connected.
+### Results
 
-### 4.7 Privacy and safety
+| Check | Result |
+|---|---|
+| Synthetic merchants × days | 205 × 30 (7,081 agent runs) |
+| **Guard violations** (hours, cadence, Soundbox text, upsell, lender scope, consent, decisions) | **0**, and CI fails if it's ever above 0 |
+| Same eval with live Sarvam labelling | **0** guard violations |
+| Distress replies handed to a person | **41 / 41** (including 4 from merchants who never consented) |
+| Every guard triggered at least once | ✅ |
+| Agent latency (keyword path) | ~1.2 ms p50 |
 
-- **PII masking** ([pakka/pii.py](pakka/pii.py)): Aadhaar numbers, PAN, Indian phone numbers and emails are replaced with `[AADHAAR]`, `[PAN]`, `[PHONE]`, `[EMAIL]` **before any text leaves the server** (for example, before it's sent to Sarvam for speech).
-- **Consent:** nothing happens without a "yes" for any action marked `needs_consent`.
-- **Audit log** ([pakka/store.py](pakka/store.py)): every intervention is stored with the journey, blocker, action, language, message, whether the policy check passed, and whether it was escalated. The attempt count per blocker is read from this log, which is what drives escalation.
-- **No loan decisions:** Pakka only helps people finish the application.
+---
 
-### 4.8 Voice ([pakka/sarvam.py](pakka/sarvam.py))
+## 6. The AI evidence: blind Hindi test
 
-- Calls the Sarvam `text-to-speech` API (`bulbul:v3`) with `en-IN` / `hi-IN`, after masking PII and capping the text at 1,500 characters.
-- If `SARVAM_API_KEY` isn't set, `/speak` returns 503 and the demo page uses the **browser's speech synthesis** instead, so the demo always works.
+A teammate who had never seen the code wrote **50 replies in Devanagari** (blind set v1). We report what we optimise: **distressed merchants who received an automated payment nudge.**
 
-### 4.9 API ([app/main.py](app/main.py))
-
-| Method | Path | What it does |
+| Blind Hindi test (50 replies) | Accuracy | Distressed merchants nudged to pay |
 |---|---|---|
-| GET | `/`, `/demo` | Landing page, live demo |
-| GET | `/health` | Health check, and whether Sarvam is enabled |
-| POST | `/journeys` | Start a journey |
-| POST | `/journeys/{id}/events` | Send an app event |
-| GET | `/journeys/{id}/rescue?now=&lang=&dry=` | Run the agent. `dry=true` only checks; otherwise the attempt count is read from the audit log and the intervention is logged |
-| GET | `/explain` | Render a template |
-| POST | `/doccheck` | OpenCV photo check (8 MB limit) |
-| GET | `/kfs/{term}?lang=` | Plain-language KFS term |
-| POST | `/speak` | Sarvam TTS |
-| GET | `/audit`, `/eval` | Audit log and evaluation results |
+| Keywords only (first version, blind) | 44% | 4 |
+| Language model alone (blind) | 78–82% | 0–5 |
+| **Pakka: model + fail-safe** | 86–88%* | **0** |
 
-### 4.10 Frontend
-
-- **Landing page** ([app/static/index.html](app/static/index.html)): the mission, headline stats, a scrolling "who it helps" reel, an interactive 7-step "how it works" walkthrough, an embedded guided tour, a "what brings you here?" help section (including a path for judges), FAQ, and "what it can and can't do".
-- **Demo page** ([app/static/demo.html](app/static/demo.html)): a mock loan journey wired to the real API. It has failure buttons (corner cut off / blur / glare / wrong file / face check / DigiLocker), clock buttons to simulate idle time, real photo upload to `/doccheck`, an EN/हिंदी toggle, voice playback, a live audit table and eval results.
-- **Guided tour** (`/demo?tour=1`): the **live app clicks through itself** with captions. It's not a recording.
-
----
-
-## 5. Evaluation: tested, and honest about it
-
-Run `python eval/run_eval.py`. **CI fails the build if any scenario or policy check fails.**
-
-| What we checked | Result |
-|---|---|
-| Synthetic journeys (5 failure types × 80, plus 100 clean or near-miss) | 500 |
-| Blocker detection accuracy | **1.00** |
-| Agent actions checked against the approved list | **2,000, 0 violations** |
-| Hand-written scenarios (expected blocker and action set by hand) | **30 / 30 passed** |
-| KFS terms explained in English and Hindi | **6 / 6 in both** |
-| Agent latency p50 / p95 (no network) | **~1.1 ms / ~1.8 ms** |
-
-### Held-out test: journeys it was never tuned on
-
-`python eval/holdout.py` builds **260 journeys from 13 new patterns** written *after* the detector. Examples: PAN upload succeeds and then Aadhaar fails, the user fixes the problem and moves on, a brief look at the KFS, a walk-away.
-
-| | Result |
-|---|---|
-| Accuracy | **0.85** |
-| False alarms on users who were fine | **0%** |
-| Stuck users missed | 11% |
-
-**The two misses are left visible on purpose, not tuned away:**
-1. One failed face check followed by a long pause isn't flagged, because the liveness rule needs two failures.
-2. Two failed uploads followed by a 10+ minute walk-away is labelled `timeout`, not `bad_photo`, so Pakka sends a resume link instead of a retake.
-
-**What the numbers mean:** the 1.00 shows the rules do what we wrote, because the synthetic data comes from the same failure taxonomy. Real accuracy, and whether Pakka actually lifts completion, can only come from a **pilot against a control group**.
-
-The handoff rate after 3 attempts is 0.8, not 1.0. That's by design: timeouts end in a callback offer, not a handoff.
-
-### Tests
-
-`pytest -q` runs **25 tests**: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images (good, cropped, blurry, glare, not an image), and the full API flow.
-
-### CI/CD
-
-GitHub Actions runs `pytest`, `run_eval.py` and `holdout.py` on every push. The Docker image runs the eval at build time.
-
----
-
-## 6. Live demo script (about 3 minutes)
-
-```bash
-pip install -r requirements.txt
-python eval/run_eval.py
-uvicorn app.main:app --reload     # http://localhost:8000
-# or: docker build -t pakka . && docker run -p 8000:8000 pakka
-```
-
-1. **Landing page `/`.** Read the mission line. Point to the 4 stats: 9 approved actions, 0 violations, 0.85 held-out, about 1 ms.
-2. **Open `/demo`** and go to the KYC step.
-3. Press **"Corner cut off" twice.** Pakka pops up without being asked. Point out the chips: blocker, action, reasons, "policy ok", latency.
-4. Switch to **हिंदी** and press **listen**: the same help in Hindi, read aloud.
-5. Press **"Yes, help me"**. That's consent. A framing guide appears.
-6. **Fail once more.** Pakka hands off to a person with the full history. Show the **audit log** table.
-7. Upload a photo. **"Upload a real photo"** runs the OpenCV check on your own image.
-8. Go to the **loan offer**, open the KFS and press the **+120s clock**. Pakka explains APR, EMI, fees, cooling-off and foreclosure.
-9. Accept, then submit.
-
-**Backup:** `/demo?tour=1` runs the whole story by itself with captions, which is handy if the Wi-Fi or your hands give out.
-
----
-
-## 7. Likely judge questions
-
-| Question | Answer |
-|---|---|
-| Where's the AI? | A LangGraph agent orchestrates detect → decide → guard → explain. OpenCV does computer vision on ID photos, and Sarvam's Indic speech model does voice. We deliberately keep generative AI out of the **decision** for safety and compliance. The roadmap adds an XGBoost + SHAP stall model trained on real event logs, with the rules kept as a fallback. |
-| Why rules and not an ML model? | We have no real event logs yet. Rules are explainable, auditable and testable today. Once a pilot produces logs, we train XGBoost and use SHAP to explain each prediction. |
-| Can it hallucinate? | No. What the user hears comes from reviewed templates, and actions are limited to an approved list checked by a guard node (0 violations in 2,000 checks). |
-| Does it decide the loan? | No. None of the 9 actions approve or reject anything. |
-| What about privacy? | PII is masked before text leaves the server, actions need consent, and every intervention is in the audit log. |
-| Is the 1.00 accuracy real? | It shows the rules do what we wrote. The honest number is the held-out **0.85 with 0 false alarms**, and we show its two failure patterns. |
-| Is it connected to Paytm? | No. It's a prototype on synthetic data only. |
-| How would it scale? | It's a stateless FastAPI service with a sub-millisecond agent. Production would move to Postgres and a Redis event stream, with consent records stored. |
-
----
-
-## 8. Roadmap
-
-1. **Pilot** on one Paytm journey (personal-loan KYC, Hindi) against a **control group**, measuring completion lift.
-2. **XGBoost + SHAP** stall model trained on real event logs, with the rules kept as a fallback.
-3. **React Native widget** inside the Paytm app, a KFS explainer on the offer screen, and **more Indian languages** through Sarvam.
-4. **Production infrastructure:** Postgres, a Redis event stream, and consent records.
-
-## 9. Status at a glance
-
-| Part | Status |
-|---|---|
-| Stall detector, policy and guard, LangGraph agent | ✅ Working |
-| EN/HI explanations + 6 KFS terms | ✅ Working |
-| OpenCV photo check | ✅ Working |
-| PII masking, audit log | ✅ Working |
-| FastAPI service, landing page, demo, guided tour | ✅ Working |
-| Sarvam Bulbul voice | ✅ Wired up (needs `SARVAM_API_KEY`, falls back to browser voice) |
-| XGBoost + SHAP model | 🔜 Planned for the pilot |
-| In-app React Native widget | 🔜 Planned |
-
----
-
-## 10. Second journey: Pakka for Merchants (`/merchant`)
-
-**Problem:** shop owners repay merchant loans through **daily deductions from their sales (EDI)**. A slow day means a short deduction, and they often only find out after a charge or a credit-score hit.
-
-**What Pakka does:** it reads the **lender's ledger** and flags a shortfall the same evening, or a sales dip before anything is overdue. It plays a **neutral Soundbox cue** (never amounts) and shows an app card with the lender's own figures in EN/HI. The merchant replies in Hindi, Hinglish or English, the reply is labelled as one of 9 fixed intents, and rules pick the response: a pay link to the lender, a reminder, a request **routed to the lender**, or a person.
-
-**Why it's safe (9 guards, tested):** consent first, but a merchant's own distress reply always reaches a person (G1); the merchant's chosen hours, inside 08:00–19:00 (G2); one contact a day, and every other day during a shortfall (G3); no loan offers with dues or after stress (G4); Soundbox cue only (G5); lender scope (G6); third attempt to a person (G7); dispute or hardship to a person (G8); no decisions, ever (G9).
-
-**Numbers:** 205 merchants × 30 days, 7,081 agent runs, **0 guard violations**, 41/41 distress replies handed to a person, ~1.2 ms p50. As with the loan journey, these show the rules work as designed on synthetic data. Real impact needs a pilot.
-
-**Positioning: don't claim Paytm lacks proactive engagement.** Paytm's Q2 FY26 release already describes AI models that predict merchant churn and delinquency "enabling proactive engagement and collections efforts". Pitch the *how*, not the *whether*:
-
-> "You already predict delinquency and engage proactively. Pakka is the layer that makes that engagement consented, private on a shared Soundbox, scripted by the lender, guarded against upsell and pressure, and auditable: the shape the January 2027 recovery rules and the May 2027 data-protection rules will require."
-
-**Paytm figures for the deck.** These come from news reports of the 26 Oct Q2 FY27 release and from earlier releases. **Confirm them in the Q2 FY27 PDF on paytm.com's investor page before quoting.**
-- Financial services distribution revenue up 49% YoY to ₹912 crore, driven by merchant loan distribution
-- 1.64 crore merchants on subscription plans
-- Repeat borrowers are more than half of merchant loan disbursements
-- Default loss guarantee (DLG) costs expected to "increase materially" from Q3 FY27, after DLG arrangements resumed with the largest lending partner
-- Merchant loans, Paytm's disclosed range (unchanged since at least Q4 FY25): Bucket-1 resolution 83–90%, recovery after 90+ DPD 30–35%, ECL 4.5–5.0%
-- Wording: say ECL is "close to the 5% regulatory limit on loss guarantees", **not** "at the 5% cap"
-
-| Likely question | Answer |
-|---|---|
-| "We already do proactive engagement." | "Yes, and Pakka doesn't replace your models. It's the response layer: consent first, a neutral Soundbox cue, lender-scripted messages, no upsell to stressed merchants, a person for hardship, and every step audited." |
-| "How accurate is your AI?" | "On 50 blind Hindi replies written by a teammate who never saw the code: 78–82% for the language model alone. Our keywords were tuned on that set afterwards, so we don't quote their score as blind. What we optimise isn't accuracy but zero harmful nudges, and that's 0 with every model. A second blind set is the next step." |
+\*Includes keywords tuned on this set afterwards, so it's not a blind number.
 
 **Pitch line (accurate as stated, don't strengthen it):**
 > "On our blind Hindi test, one LLM on its own gave 5 distressed merchants a payment nudge. With our fail-safe on top, that's 0 for every model we tried. The safety doesn't depend on which model you pick: when unsure, Pakka routes to a person."
 
-Don't name or criticise a provider on stage. 78% vs 82% is within the noise of a 50-reply test.
+**How to read it:**
+- Only the "alone" rows are blind. The LLM prompts contain nothing from the test set.
+- 50 replies means roughly ±13 points of uncertainty, so 78% vs 82% is a tie. **Don't rank or criticise a provider on stage.**
+- The combination's value is safety, not a measurable accuracy gain on this set.
+- Next step: a second blind set (romanised Hindi, typos, mixed signals), then a pilot.
 
-**Slide table:**
+---
 
-| Blind Hindi test (50 replies) | Accuracy | Distressed merchants nudged to pay |
-|---|---|---|
-| Keywords only (first version) | 44% | 4 |
-| Language model alone | 78–82% | 0–5 |
-| **Pakka: model + fail-safe** | 86–88%* | **0** |
+## 7. Engineering quality
 
-\*Includes keywords tuned on this set; not a blind number.
+| | |
+|---|---|
+| **Tests** | 154 pytest tests: detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
+| **CI** | GitHub Actions runs the tests, `run_eval.py`, `holdout.py` and `merchant_eval.py` on every push |
+| **Docker** | `docker build -t pakka .` runs the evals at build time; `.dockerignore` keeps secrets out of the image |
+| **Secrets** | Keys live only in `.env`, which is git-ignored and never printed. The git history has been scanned clean |
+| **Defaults** | With no LLM configured, everything runs offline. That's the demo setting |
 
-**Demo (about 3 minutes, or `/merchant?tour=1`):**
-1. `kirana_steady`: run 5 days. Nothing happens, so no false alarms.
-2. `chai_seasonal`: consent screen → Allow → day 10 → Soundbox cue and app card → reply "Kal de dunga" → reminder at 08:00 plus a pay link → Next day → cured, thank-you, no offer.
-3. `general_late_night`: clock 21:30, day 6 → `G2_hours deferred to 08:00` in the audit.
-4. `tailor_stress`: day 15 → reply "Bimar tha, dukaan band thi" → handoff with the grievance officer → "View loan offers" is greyed out (`G4_no_upsell`).
-5. Lender view: routed requests `pending lender decision`, the audit log, and **Guard violations = 0**.
+---
+
+## 8. Live demo script (about 6 minutes for both, or 3 for one)
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload          # http://localhost:8000
+# or: docker build -t pakka . && docker run -p 8000:8000 pakka
+```
+Run the demo **offline** (no `PAKKA_LLM_PROVIDER`), so no network call can fail on stage.
+
+**Journey A (`/demo`):**
+1. Go to KYC, choose the **"Corner cut off"** sample: a **preview** shows the file before anything is sent. Press **Submit this document** twice: the real OpenCV check rejects it, and Pakka steps in unasked. Show the chips (blocker, action, reasons, "policy ok", latency). Finish with the **"✓ Good photo"** sample, which passes.
+2. Switch to **हिंदी** and press listen.
+3. **"Yes, help me"** gives consent, and the framing guide appears.
+4. **Fail once more:** handoff to a person; show the audit log.
+5. **Loan offer:** open the KFS and press **+120 s**. Pakka explains APR, EMI, fees, cooling-off and foreclosure.
+
+**Journey B (`/merchant`):**
+1. **Kirana:** allow, run 5 days. Nothing happens, so no false alarms.
+2. **Chai stall:** show the consent screen (with contact hours) → Allow → day 10. The Soundbox plays the neutral cue and the app card appears. Reply **"Kal de dunga"**: reminder at 08:00 plus a pay link. **Next day:** cured, thank-you, no offer.
+3. **General store:** clock 21:30, day 6 → `G2_hours deferred to 08:00`.
+4. **Tailor:** day 15 → reply **"Bimar tha, dukaan band thi"**: handoff with the grievance officer; "View loan offers" is greyed out (G4).
+5. **Lender view:** routed requests, the audit log, **guard violations = 0**.
+
+**Backups:** `/demo?tour=1` and `/merchant?tour=1` drive the live app with captions. Keep recorded videos of both, with sound.
+
+---
+
+## 9. Likely judge questions
+
+| Question | Answer |
+|---|---|
+| "We already do proactive engagement." | "Yes, and Pakka doesn't replace your models. It's the response layer: consent first, a neutral Soundbox cue, lender-scripted messages, no upsell to stressed merchants, a person for hardship, and every step audited." |
+| "How accurate is your AI?" | "On 50 blind Hindi replies written by a teammate who never saw the code: 78–82% for the language model alone. Our keywords were tuned on that set afterwards, so we don't quote their score as blind. What we optimise isn't accuracy but zero harmful nudges, and that's 0 with every model. A second blind set is the next step." |
+| "Where's the AI?" | "Three places: LangGraph agents orchestrate each journey; OpenCV checks ID photos; and a language model, Sarvam or Gemini, reads merchants' Hindi replies. We deliberately keep AI out of the decision. Rules decide, guards check, templates speak." |
+| "Can it hallucinate?" | "No. Users only see reviewed templates; the LLM can only output one of 9 labels, and anything else becomes 'unclear'." |
+| "Does it decide the loan?" | "Never. No action approves, rejects, waives or reschedules. Requests go to the lender, which decides." |
+| "What about privacy?" | "PII is masked before any text leaves the server, consent is versioned and revocable, the Soundbox never says an amount, and everything is audited." |
+| "Why rules and not ML?" | "No real event logs yet. Rules are explainable and testable today. With pilot data we'd train a stall model, keeping the rules as the fallback and the guards as the safety layer." |
+| "Is the 1.00 accuracy real?" | "It only shows the rules do what we wrote. Our honest number is 0.85 on journeys the rules never saw, with 0 false alarms, and we show the two patterns it misses." |
+| "Is it connected to Paytm?" | "No. It's a prototype on synthetic data." |
+| "Will it scale?" | "Stateless FastAPI with a ~1 ms agent. Production adds Postgres, an event stream and a scheduled queue for deferred contacts." |
+
+---
+
+## 10. Paytm figures for the deck
+
+From news reports of the 26 Oct Q2 FY27 release and earlier releases. **Confirm them in the PDF on paytm.com's investor page before quoting.**
+- Financial services distribution revenue up 49% YoY to ₹912 crore, driven by merchant loan distribution
+- 1.64 crore merchants on subscription plans
+- Repeat borrowers are more than half of merchant loan disbursements
+- Default loss guarantee (DLG) costs expected to "increase materially" from Q3 FY27
+- Merchant loans, disclosed range (unchanged since at least Q4 FY25): Bucket-1 resolution 83–90%, recovery after 90+ DPD 30–35%, ECL 4.5–5.0%
+- Say ECL is **"close to the 5% limit"**, not "at the cap"
+
+---
+
+## 11. Roadmap
+
+1. **Pilot** on one journey (personal-loan KYC in Hindi, or merchant EDI) against a randomised control group. Measure completion lift, day-0 and day-7 cure rate, SMA-0 → SMA-1 roll rate, complaints and opt-outs.
+2. **Second blind set** for the reply classifier, then the LLM measured on real replies.
+3. **Personalisation test:** whether naming the lender and the merchant's own sales figure lifts response (the first thing the pilot tests).
+4. **Stall model** (XGBoost + SHAP) on real event logs, with rules kept as the fallback.
+5. **Production:** an in-app widget, Postgres, an event stream, a scheduled queue, and more languages through Sarvam.
+
+---
+
+## 12. Status at a glance
+
+| Part | Status |
+|---|---|
+| Loan rescue: detector, policy, guard, agent, EN/HI, KFS, OpenCV, voice | ✅ Working |
+| Merchant rescue: ledger, rules R1–R4, guards G1–G9, consent, Soundbox cue, lender view | ✅ Working |
+| Fail-safe reply classifier (offline) | ✅ Working (the demo default) |
+| Optional LLM labelling: Sarvam, Gemini, Anthropic | ✅ Working, blind-tested |
+| Landing page, both demos, both guided tours | ✅ Working; tours checked in a browser |
+| 154 tests, CI, Docker | ✅ Passing |
+| Second blind test set | 🔜 Next step |
+| Pilot with real data | 🔜 Next step |
 
 ---
 
 ### Closing line
 
-> *A failed upload isn't a no.* Pakka makes sure every stuck user reaches either a fix or a person.
+> *A failed upload isn't a no, and a slow day isn't a default.* Pakka makes sure every stuck borrower and every struggling merchant reaches either a fix or a person.

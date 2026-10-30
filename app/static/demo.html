@@ -190,6 +190,21 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 .success{text-align:center;padding:24px 0}
 .success .tk{width:60px;height:60px;border-radius:50%;background:var(--green);color:#fff;font-size:28px;display:grid;place-items:center;margin:0 auto 12px}
 
+.pick{border:1.5px dashed #C9D4E3;border-radius:12px;padding:10px 12px;margin-top:10px}
+.pick .h{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#demo .pick button,#demo .pick .btn{font-size:13px;padding:7px 11px}
+#demo .pick button.on{border-color:var(--cyan);background:#EAF8FF}
+.preview{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;background:#fff}
+.preview.guide{outline:2.5px dashed var(--cyan);outline-offset:3px}
+.preview .pv{width:320px;max-width:50%;aspect-ratio:3/2;border-radius:8px;background:var(--ink2);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.preview .pv img{width:100%;height:100%;object-fit:contain}
+.preview .pv .pdf{color:#D8F4FF;text-align:center;font-size:12.5px;padding:10px}
+.preview .pv .pdf svg{width:42px;height:42px;stroke:#D8F4FF;fill:none;stroke-width:1.5;display:block;margin:0 auto 6px}
+.preview .meta{flex:1;min-width:0;font-size:13px;color:var(--muted);line-height:1.55}
+.preview .meta b{color:var(--ink);font-size:14px;word-break:break-all}
+#demo button:disabled{opacity:.4;cursor:default}
+.verdict{display:inline-block;margin-top:6px;padding:4px 10px;border-radius:999px;font-weight:600;font-size:12.5px}
+.verdict.wait{background:var(--paper);color:var(--muted)}.verdict.ok{background:var(--greenBg);color:var(--green)}.verdict.bad{background:var(--amberBg);color:var(--amber)}
 .demo{border:1.5px dashed #C9D4E3;border-radius:14px;padding:13px 16px}
 .demo .h{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
 .demo .row{margin:6px 0 0}
@@ -211,6 +226,8 @@ h3{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:17px;colo
 .msg{white-space:pre-line}
 .why{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 2px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.techsw{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#C7D1E0;cursor:pointer;margin-right:6px}
+.techsw input{accent-color:#00BAF2}
 .chip{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
 .chip.warn{background:var(--amberBg);color:var(--amber);border-color:transparent}
 .lang{display:flex;background:var(--paper);border-radius:99px;padding:3px}
@@ -246,8 +263,8 @@ body.embed .dbar{display:none}
 <main id="demo">
 <header class="dbar"><div class="in">
 <a class="brand" href="/"><i></i>Pakka</a>
-<div class="mid">Live demo · sample personal loan journey · synthetic data, not connected to Paytm</div>
-<div class="acts"><a class="pill" href="/demo?tour=1">&#9654; Watch the tour</a><a class="pill hide-sm" href="/demo">Restart</a><a class="pill solid" href="/">Back to Pakka</a></div>
+<div class="mid">Live demo · a sample loan application · practice data, not connected to Paytm</div>
+<div class="acts"><a class="pill" href="/demo?tour=1">&#9654; Watch the tour</a><label class="techsw hide-sm"><input type="checkbox" id="tech"> Show technical details</label><a class="pill hide-sm" href="/demo">Restart</a><a class="pill hide-sm" href="/merchant">Merchant demo</a><a class="pill solid" href="/">Back to Pakka</a></div>
 </div></header>
 <div class="app">
 <aside class="side">
@@ -273,8 +290,8 @@ body.embed .dbar{display:none}
 <div id="screen"></div>
 </section>
 <div class="demo">
-<div class="h">Demo controls · simulate time passing</div>
-<div class="clock">Simulated clock: <b id="clock">0s</b>
+<div class="h">Demo buttons · pretend time passes</div>
+<div class="clock">Time on this page: <b id="clock">0s</b>
 <button class="ghost" data-tick="30">+30s</button><button class="ghost" data-tick="120">+2 min</button><button class="ghost" data-tick="900">+15 min</button>
 </div>
 </div>
@@ -297,8 +314,8 @@ body.embed .dbar{display:none}
 </div>
 <div class="toast" id="toast"></div>
 </section>
-<section class="card sm"><h3>Audit log</h3><div class="muted">Every Pakka intervention in this journey is written here.</div><table id="audit"></table></section>
-<section class="card sm"><h3>Evaluation</h3><div id="eval" class="muted">Run <code>python eval/run_eval.py</code> to fill this in.</div></section>
+<section class="card sm"><h3>What Pakka did</h3><div class="muted">Every step Pakka takes in this application is written down here.</div><table id="audit"></table></section>
+<section class="card sm"><h3>How we tested it</h3><div id="eval" class="muted">Run <code>python eval/run_eval.py</code> to fill this in.</div></section>
 </aside>
 </div>
 <div class="cap" id="cap"><div class="n"></div><div class="t"></div><div class="prog"><i></i></div>
@@ -322,9 +339,20 @@ async function check(trigger){
   last=await api(`/journeys/${jid}/rescue?now=${clock}&lang=${lang}`);
   show(last);loadAudit();
 }
+let tech=false;   // "Show technical details": codes instead of plain words
+const PROBLEM={bad_photo:"The photo didn't go through",wrong_format:"Wrong file type",liveness:"The face check keeps failing",
+  digilocker:"No DigiLocker account",offer_jargon:"Stuck on the loan terms",timeout:"Away from the application for a while"};
+const FIX={guided_recapture:"Help retaking the photo",convert_file:"Convert the file",retry_liveness_tips:"Tips for the face check",
+  switch_to_video_kyc:"A video call instead",digilocker_setup_help:"Help setting up DigiLocker",explain_kfs:"Explain the loan terms",
+  send_resume_link:"A link to continue later",schedule_callback:"A call from our team",human_handoff:"Passed to a person"};
+const PHOTO={IMG_CROPPED:"a corner is cut off",IMG_BLUR:"it's blurry",IMG_GLARE:"there's glare",FILE_FORMAT:"it isn't a photo"};
+const LANGS={en:"English",hi:"Hindi"};
+
 function show(r){
   open=true;$("#pakka").classList.add("show");$("#msg").textContent=r.message;$("#toast").textContent="";
-  $("#chips").innerHTML=[`blocker: ${r.detection.blocker}`,`action: ${r.action}`,...r.detection.reasons,r.escalated?"escalated to a person":"",r.policy_ok?"policy ok":"policy blocked",`${r.latency_ms} ms`].filter(Boolean).map(c=>`<span class="chip ${c.startsWith("escalated")?"warn":""}">${c}</span>`).join("");
+  const list=tech?[`blocker: ${r.detection.blocker}`,`action: ${r.action}`,...r.detection.reasons,r.escalated?"escalated to a person":"",r.policy_ok?"policy ok":"policy blocked",`${r.latency_ms} ms`]
+    :[`Problem: ${PROBLEM[r.detection.blocker]||r.detection.blocker}`,`Pakka's help: ${FIX[r.action]||r.action}`,r.escalated?"escalated to a person":"",r.policy_ok?"":"Not on the allowed list, so a person takes over"];
+  $("#chips").innerHTML=list.filter(Boolean).map(c=>`<span class="chip ${c.startsWith("escalated")?"warn":""}">${c}</span>`).join("");
   $("#yes").style.display=r.needs_consent?"":"none";$("#yes").textContent=lang==="hi"?"हाँ, मदद करो":"Yes, help me";
 }
 function hide(){open=false;$("#pakka").classList.remove("show")}
@@ -337,12 +365,12 @@ async function relang(l){
 }
 
 const EFFECT={
-  guided_recapture:()=>{step="kyc";render(true)},
-  convert_file:()=>toast("File converted to PDF (simulated). Try uploading again."),
-  switch_to_video_kyc:()=>toast("Video KYC slot booked (simulated)."),
-  digilocker_setup_help:()=>toast("DigiLocker setup guide opened (simulated)."),
-  schedule_callback:()=>toast("Callback requested (simulated)."),
-  human_handoff:()=>toast("Handed to an agent with the full journey history (simulated)."),
+  guided_recapture:()=>{guideOn=true;step="kyc";render()},
+  convert_file:()=>toast("File converted to PDF (demo). Try uploading again."),
+  switch_to_video_kyc:()=>toast("Video call booked (demo)."),
+  digilocker_setup_help:()=>toast("DigiLocker setup guide opened (demo)."),
+  schedule_callback:()=>toast("Our team will call you (demo)."),
+  human_handoff:()=>toast("Passed to a person who can see everything so far (demo)."),
 };
 function toast(t){$("#toast").textContent=t}
 
@@ -350,7 +378,7 @@ const ICON='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx
 const FILE='<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
 const doc=(t,s,st,cls,ic=FILE)=>`<div class="doc"><div class="ic">${ic}</div><div class="t"><b>${t}</b><span>${s}</span></div><span class="st ${cls}">${st}</span></div>`;
 
-function render(guide){
+function render(){
   const at=done?STEPS.length:STEPS.indexOf(step);
   $("#steps").innerHTML=STEPS.map((s,i)=>`<div class="${i<at?"done":i===at?"now":""}"><b>${i<at?"✓":i+1}</b>${LABEL[s]}</div>`).join("");
   $("#stepno").textContent=done?"Completed":`Step ${at+1} of ${STEPS.length} · ${LABEL[step]}`;
@@ -362,15 +390,18 @@ function render(guide){
   if(step==="kyc")S.innerHTML=`<h3>Upload documents</h3><p class="muted">We need these to verify your identity.</p>
   <div class="docs">
   <div class="doc now"><div class="ic">${ICON}</div><div class="t"><b>Identity proof</b><span>Aadhaar card, front side</span></div><span class="st need">Action needed</span>
-   <div class="upl">${guide?`<div class="frame">Keep all four corners inside the frame</div>`:""}
-   <div class="row"><label class="btn primary">Upload a real photo<input type="file" id="file" accept="image/*" hidden></label><button id="ok">Good photo (simulated)</button></div>
+   <div class="upl">${guideOn?`<div class="frame">Keep all four corners inside the frame</div>`:""}
+   <div class="pick"><div class="h">Demo · choose which file to upload</div>
+    <div class="row">${SAMPLES.map(([k,l])=>`<button data-sample="${k}" class="${pick&&pick.kind===k?"on":""}">${l}</button>`).join("")}
+    <label class="btn">Your own photo…<input type="file" id="file" hidden></label></div></div>
+   <div id="preview"></div>
    <div class="muted" id="doc"></div></div></div>
   ${doc("PAN card","From basic details","Verified","ok")}
   ${doc("Income proof","Salary slip","Uploaded","ok")}
   ${doc("Bank statement","Last 3 months","Next","wait")}
   </div>
-  <div class="demo" style="margin-top:16px"><div class="h">Demo controls · simulate what real users hit</div>
-  <div class="row"><button data-fail="IMG_CROPPED">Corner cut off</button><button data-fail="IMG_BLUR">Blurry</button><button data-fail="IMG_GLARE">Glare</button><button data-fail="FILE_FORMAT">Wrong file type</button><button id="live">Face check fails</button><button id="dl">No DigiLocker</button></div></div>`;
+  <div class="demo" style="margin-top:16px"><div class="h">Demo buttons · other things that go wrong at KYC</div>
+  <div class="row"><button id="live">Face check fails</button><button id="dl">No DigiLocker</button></div></div>`;
   if(step==="offer")S.innerHTML=`<h3>Your loan offer</h3><p class="muted">Sample numbers for the demo.</p>
   <div class="offercard"><div class="amt">Loan amount</div><strong>₹50,000</strong><div class="g"><div><span>Tenure</span><b>12 months</b></div><div><span>EMI</span><b>₹4,600</b></div><div><span>APR</span><b>21.6%</b></div></div></div>
   <div class="row"><button id="kfs">Open Key Fact Statement</button><button id="back">Go back</button><button class="primary" id="accept">Accept offer</button></div>`;
@@ -384,27 +415,70 @@ function render(guide){
 function bind(){
   const on=(id,f)=>{const el=document.getElementById(id);if(el)el.onclick=f};
   on("next",()=>go(STEPS[STEPS.indexOf(step)+1]));
-  on("ok",async()=>{await send("upload_ok");hide();await go("offer")});
   on("live",()=>send("liveness_failed","LIVENESS"));
   on("dl",()=>send("digilocker_error","NOT_REGISTERED"));
   on("kfs",()=>send("kfs_open"));
   on("back",()=>send("back"));
   on("accept",async()=>{hide();await go("bank")});
   on("submit",async()=>{await send("submit");done=true;hide();render()});
-  document.querySelectorAll("[data-fail]").forEach(b=>b.onclick=()=>send("upload_failed",b.dataset.fail));
+  document.querySelectorAll("[data-sample]").forEach(b=>b.onclick=()=>choose(b.dataset.sample));
   const f=document.getElementById("file");
-  if(f)f.onchange=async()=>{const fd=new FormData();fd.append("file",f.files[0]);f.value="";
-    const r=await api("/doccheck",{method:"POST",body:fd});
-    $("#doc").textContent=`Doc check: ${r.ok?"looks good":r.issues.join(", ")} · sharpness ${r.metrics.sharpness??"-"} · glare ${r.metrics.glare_ratio??"-"}`;
-    if(r.ok){await send("upload_ok");hide();await go("offer")}else await send("upload_failed",r.issues[0])};
+  if(f)f.onchange=()=>{if(f.files[0])choose(null,f.files[0]);f.value=""};
+  drawPreview();
 }
 
-async function loadAudit(){const rows=(await api("/audit?limit=200")).filter(r=>r.journey_id===jid).slice(0,8);$("#audit").innerHTML="<tr><th>Journey</th><th>Blocker</th><th>Action</th><th>Lang</th><th>Policy</th></tr>"+rows.map(r=>`<tr><td>${r.journey_id}</td><td>${r.blocker}</td><td>${r.action}${r.escalated?" ⇢ person":""}</td><td>${r.lang}</td><td>${r.policy_ok?"ok":"blocked"}</td></tr>`).join("")}
+// Upload step: pick a file, see it, then submit. The server's photo check (OpenCV) decides pass or fail.
+const SAMPLES=[["good","✓ Good photo"],["cropped","Corner cut off"],["blurry","Blurry"],["glare","Glare"],["wrong_file","Wrong file (Word)"]];
+let pick=null,guideOn=false,checking=false;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const size=n=>n>=1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB";
+function kindOf(t){return t.startsWith("image/")?`Photo (${t.split("/")[1].toUpperCase()})`:t==="application/pdf"?"PDF document":t.includes("word")?"Word document":"Other file"}
+async function choose(kind,file){
+  if(pick)URL.revokeObjectURL(pick.url);
+  let blob=file,name=file&&file.name;
+  if(kind){const r=await fetch(`/samples/${kind}`);blob=await r.blob();name=(r.headers.get("content-disposition")||"").match(/filename="([^"]+)"/)?.[1]||kind}
+  pick={kind,blob,name,type:blob.type||"",url:URL.createObjectURL(blob),result:null};
+  document.querySelectorAll("[data-sample]").forEach(b=>b.classList.toggle("on",b.dataset.sample===kind));
+  $("#doc").textContent="";drawPreview();
+}
+function drawPreview(){
+  const P=$("#preview");if(!P)return;
+  const g=guideOn?" guide":"";
+  if(!pick){P.innerHTML=`<div class="preview${g}"><div class="pv"><div class="pdf">${FILE}No file chosen yet</div></div><div class="meta">Choose a file above. You'll see it here <b style="font-size:13px">before</b> anything is sent.</div></div>`;return}
+  const img=pick.type.startsWith("image/"),r=pick.result;
+  const verdict=checking?`<span class="verdict wait">Checking the photo…</span>`
+    :!r?`<span class="verdict wait">Not sent yet</span>`
+    :r.ok?`<span class="verdict ok">✓ Photo check passed</span>`
+    :`<span class="verdict bad">✗ Didn't pass: ${r.issues.map(i=>PHOTO[i]||i).join(" and ")}</span>`;
+  const m=r&&tech&&r.metrics.sharpness!=null?`<div>sharpness ${r.metrics.sharpness} (needs ≥ 60) · glare ${(r.metrics.glare_ratio*100).toFixed(1)}% (max 6%) · card found: ${r.metrics.card_found?"yes":"no"}</div>`:"";
+  P.innerHTML=`<div class="preview${g}"><div class="pv">${img?`<img src="${pick.url}" alt="Preview of ${esc(pick.name)}">`:`<div class="pdf">${FILE}${esc(pick.name)}<br>This isn't a photo, so it can't be shown</div>`}</div>
+   <div class="meta"><div>Preview · this is what will be sent</div><b>${esc(pick.name)}</b><div>${size(pick.blob.size)} · ${kindOf(pick.type)}</div>${verdict}${m}
+   <div class="row"><button class="primary" id="sendDoc" ${checking||(r&&r.ok)?"disabled":""}>Submit this document</button><button id="clearDoc">Choose another</button></div>
+   <div style="font-size:12px;margin-top:6px">Checked on our server for blur, glare and cut-off corners. Not stored.</div></div></div>`;
+  $("#sendDoc").onclick=submitDoc;
+  $("#clearDoc").onclick=()=>{URL.revokeObjectURL(pick.url);pick=null;document.querySelectorAll("[data-sample]").forEach(b=>b.classList.remove("on"));drawPreview()};
+}
+async function submitDoc(){
+  if(!pick||checking)return;
+  checking=true;drawPreview();
+  const fd=new FormData();fd.append("file",pick.blob,pick.name);
+  let r;try{r=await api("/doccheck",{method:"POST",body:fd})}finally{checking=false}
+  pick.result=r;drawPreview();
+  $("#doc").textContent=tech?`Doc check: ${r.ok?"looks good":r.issues.join(", ")} · sharpness ${r.metrics.sharpness??"-"} · glare ${r.metrics.glare_ratio??"-"}`
+    :`Photo check: ${r.ok?"looks good":"didn't pass, because "+r.issues.map(i=>PHOTO[i]||i).join(" and ")}`;
+  if(r.ok){await new Promise(s=>setTimeout(s,2000));await send("upload_ok");hide();URL.revokeObjectURL(pick.url);pick=null;guideOn=false;await go("offer")}
+  else await send("upload_failed",r.issues[0]);
+}
+
+async function loadAudit(){const rows=(await api("/audit?limit=200")).filter(r=>r.journey_id===jid).slice(0,8);$("#audit").innerHTML=tech?"<tr><th>Journey</th><th>Blocker</th><th>Action</th><th>Lang</th><th>Policy</th></tr>"+rows.map(r=>`<tr><td>${r.journey_id}</td><td>${r.blocker}</td><td>${r.action}${r.escalated?" ⇢ person":""}</td><td>${r.lang}</td><td>${r.policy_ok?"ok":"blocked"}</td></tr>`).join("")
+  :"<tr><th>Problem</th><th>Pakka's help</th><th>Language</th><th>Allowed?</th></tr>"+rows.map(r=>`<tr><td>${PROBLEM[r.blocker]||r.blocker}</td><td>${FIX[r.action]||r.action}${r.escalated?" ⇢ person":""}</td><td>${LANGS[r.lang]||r.lang}</td><td>${r.policy_ok?"Yes":"No, so a person took over"}</td></tr>`).join("")}
 async function loadEval(){try{const e=await api("/eval");const s=e.scripted_scenarios,p=e.policy,d=e.detection,l=e.latency;
-  $("#eval").innerHTML=`<table><tr><td>Synthetic journeys</td><td>${e.dataset.journeys}</td></tr><tr><td>Blocker detection accuracy</td><td>${d.accuracy}</td></tr><tr><td>Actions checked / policy violations</td><td>${p.actions_checked} / ${p.violations}</td></tr><tr><td>Scripted scenarios passed</td><td>${s.passed} / ${s.scenarios}</td></tr><tr><td>Agent latency p50 / p95</td><td>${l.p50_ms} / ${l.p95_ms} ms</td></tr></table><p class="muted">Synthetic data uses the same failure taxonomy as the detector, so this checks the logic, not real-world accuracy.</p>`}catch(e){}}
+  $("#eval").innerHTML=tech?`<table><tr><td>Synthetic journeys</td><td>${e.dataset.journeys}</td></tr><tr><td>Blocker detection accuracy</td><td>${d.accuracy}</td></tr><tr><td>Actions checked / policy violations</td><td>${p.actions_checked} / ${p.violations}</td></tr><tr><td>Scripted scenarios passed</td><td>${s.passed} / ${s.scenarios}</td></tr><tr><td>Agent latency p50 / p95</td><td>${l.p50_ms} / ${l.p95_ms} ms</td></tr></table><p class="muted">Synthetic data uses the same failure taxonomy as the detector, so this checks the logic, not real-world accuracy.</p>`
+  :`<table><tr><td>Practice applications run</td><td>${e.dataset.journeys}</td></tr><tr><td>Fixes checked against the allowed list</td><td>${p.actions_checked}, with ${p.violations} rule breaks</td></tr><tr><td>Hand-written test cases passed</td><td>${s.passed} of ${s.scenarios}</td></tr><tr><td>Time for Pakka to decide</td><td>about ${Math.round(l.p50_ms)} ms</td></tr><tr><td>On 260 new cases it never saw</td><td>right 85% of the time, with no false alarms</td></tr></table><p class="muted">The practice applications use the same problems the rules look for, so they check the logic, not real-world accuracy. Real accuracy needs a pilot.</p>`}catch(e){}}
 
 $("#yes").onclick=()=>{const a=last?.action;(EFFECT[a]||(()=>toast("Done.")))();if(a!=="guided_recapture")hide()};
 $("#no").onclick=hide;
+$("#tech").onchange=e=>{tech=e.target.checked;if(last)show(last);drawPreview();loadAudit();loadEval()};
 $("#listen").onclick=async()=>{const text=$("#msg").textContent;
   try{const r=await fetch("/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,lang})});
     if(r.ok){new Audio(URL.createObjectURL(await r.blob())).play();return}}catch(e){}
@@ -464,14 +538,16 @@ document.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{clock+=+b.dat
   }
   const STEPS=[
     ["Samina is applying for a personal loan. Her details are already filled in.","#screen",()=>click("#next")],
-    ["At KYC, her Aadhaar photo gets rejected because a corner is cut off.","[data-fail=IMG_CROPPED]",()=>click("[data-fail=IMG_CROPPED]")],
-    ["It fails a second time. She hasn't asked for help, but Pakka notices the stall.","[data-fail=IMG_CROPPED]",()=>click("[data-fail=IMG_CROPPED]")],
+    ["At KYC she chooses a photo of her ID card. The app shows a preview first, so she sees exactly what will be sent.","#preview",()=>click("[data-sample=cropped]")],
+    ["She submits it. Our photo check runs on the server and finds a corner of the card cut off.","#preview",async()=>{await sleep(300);click("#sendDoc")}],
+    ["She sends the same photo again, and it fails again. She hasn't asked for help, but Pakka notices she's stuck.","#pakka",()=>click("#sendDoc")],
     ["Pakka explains what went wrong and shows exactly why it stepped in.","#pakka",null],
     ["The same help in Hindi, which she can also listen to.","#pakka",()=>click("[data-lang=hi]")],
-    ["She says yes. Nothing happens without her consent, and a framing guide appears.",".doc.now",()=>click("#yes")],
-    ["It fails again. Rather than loop, Pakka hands her to a person with her full history.","#pakka",()=>click("[data-fail=IMG_CROPPED]")],
-    ["Every intervention is written to the audit log.","#audit",null],
-    ["Back in English, the photo goes through and she reaches the loan offer.","#screen",()=>{click("[data-lang=en]");setTimeout(()=>click("#ok"),300)}],
+    ["She says yes. Nothing happens without her consent, and a guide shows how to fit the whole card in the frame.",".doc.now",()=>click("#yes")],
+    ["Her next photo is blurry. Rather than loop, Pakka hands her to a person who can see everything so far.","#preview",async()=>{click("[data-sample=blurry]");await sleep(600);click("#sendDoc")}],
+    ["Every step Pakka takes is written down.","#audit",null],
+    ["She retakes it properly: the whole card, sharp, no glare. Preview, submit, and the photo check passes.","#preview",async()=>{click("[data-lang=en]");await sleep(300);click("[data-sample=good]");await sleep(900);click("#sendDoc")}],
+    ["She reaches her loan offer.","#screen",null],
     ["She opens the Key Fact Statement and hesitates for two minutes.","#kfs",()=>{click("#kfs");setTimeout(()=>click("[data-tick='120']"),400)}],
     ["Pakka explains APR, EMI, fees, the cooling-off period and foreclosure in plain words.","#pakka",null],
     ["She accepts, confirms her bank account and submits.","#screen",async()=>{click("#accept");await sleep(700);click("#next");await sleep(700);click("#submit")}],

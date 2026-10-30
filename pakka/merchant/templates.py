@@ -12,17 +12,17 @@ SOUNDBOX_CUE = {
 TEMPLATES = {
     "T_SB_CUE": SOUNDBOX_CUE,
     "T_SHORTFALL": {
-        "en": "Today's settlement didn't fully cover your daily instalment to {lender}. "
+        "en": "Today's sales weren't enough for your daily loan payment to {lender}. "
               "Short today: {shortfall}. Total due now: {overdue}, unpaid since {oldest}. "
               "{penal_note}. You can pay now, pay later, ask {lender} for a lower daily deduction "
               "or a new date, or ask for a call.",
-        "hi": "आज के सेटलमेंट से {lender} की आपकी रोज़ की किस्त पूरी नहीं कटी। "
+        "hi": "आज की बिक्री से {lender} की आपकी रोज़ की किस्त पूरी नहीं कटी। "
               "आज की कमी: {shortfall}। अभी कुल बकाया: {overdue}, {oldest} से। "
               "{penal_note}। आप अभी भर सकते हैं, बाद में भर सकते हैं, {lender} से कम कटौती या "
               "नई तारीख माँग सकते हैं, या कॉल माँग सकते हैं।",
     },
     "T_ARREARS": {
-        "en": "Your daily instalments to {lender} are behind. Total due now: {overdue}, unpaid since {oldest}. "
+        "en": "You're behind on your daily loan payments to {lender}. Total due now: {overdue}, unpaid since {oldest}. "
               "{penal_note}. You can pay now, pay later, ask {lender} for a lower daily deduction "
               "or a new date, or ask for a call.",
         "hi": "{lender} की आपकी रोज़ की किस्तें पीछे चल रही हैं। अभी कुल बकाया: {overdue}, {oldest} से। "
@@ -31,7 +31,7 @@ TEMPLATES = {
     },
     "T_DIP_RISK": {
         "en": "Your sales over the last {window} days averaged {avg} a day, close to your daily "
-              "instalment of {edi} to {lender}. Nothing is overdue. If a slow stretch is coming, "
+              "loan payment of {edi} to {lender}. Nothing is late yet. If a slow stretch is coming, "
               "you can ask {lender} for a lower daily deduction, or ask for a call.",
         "hi": "पिछले {window} दिनों में आपकी औसत रोज़ की बिक्री {avg} रही, जो {lender} की रोज़ की "
               "किस्त {edi} के करीब है। अभी कुछ बकाया नहीं है। अगर आगे धंधा धीमा रहने वाला है, तो "

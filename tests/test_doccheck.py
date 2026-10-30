@@ -39,3 +39,33 @@ def test_glare():
 
 def test_not_an_image():
     assert check_image(b"%PDF-1.4 not an image")["issues"] == ["FILE_FORMAT"]
+
+
+# Demo sample files: the real photo check must judge each one as its button says.
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+from pakka.samples import KINDS, make_sample  # noqa: E402
+
+EXPECTED = {"good": [], "cropped": ["IMG_CROPPED"], "blurry": ["IMG_BLUR"],
+            "glare": ["IMG_GLARE"], "wrong_file": ["FILE_FORMAT"]}
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_sample_gets_expected_verdict(kind):
+    data, _, _ = make_sample(kind)
+    assert check_image(data)["issues"] == EXPECTED[kind]
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_sample_round_trip_through_api(kind):
+    c = TestClient(app)
+    r = c.get(f"/samples/{kind}")
+    assert r.status_code == 200 and "filename=" in r.headers["content-disposition"]
+    verdict = c.post("/doccheck", files={"file": ("x", r.content, r.headers["content-type"])}).json()
+    assert verdict["issues"] == EXPECTED[kind]
+
+
+def test_unknown_sample_is_404():
+    assert TestClient(app).get("/samples/nope").status_code == 404

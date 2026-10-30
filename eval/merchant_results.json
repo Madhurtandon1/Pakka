@@ -55,8 +55,8 @@
     "G6_lender_scope": 4
   },
   "latency": {
-    "p50_ms": 1.04,
-    "p95_ms": 2.93,
+    "p50_ms": 1.41,
+    "p95_ms": 3.99,
     "note": "keyword path, no network"
   }
 }
