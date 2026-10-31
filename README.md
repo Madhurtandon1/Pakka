@@ -2,7 +2,7 @@
 
 **Team Queen** · Paytm Build for India AI Hackathon (Delhi) · Track 2: AI-Powered Financial Journeys
 
-Pakka spots when someone is stuck in a loan application, tells them what went wrong in their own language, and helps them fix it. This repo is the working prototype of that rescue loop. It runs on synthetic data only and is not connected to Paytm.
+Pakka spots when someone is stuck in a loan application, tells them what went wrong in their own language, and helps them fix it. The same engine also helps **shop owners repaying a merchant loan** from their daily sales: it warns them early when a day falls short, in English, Hindi, Bengali, Odia or Telugu, and sends anything that needs a decision to the lender. This repo is the working prototype of both. It runs on synthetic data only and is not connected to Paytm.
 
 ```
 spot it  →  explain it  →  fix it (with consent)  →  check it worked  →  hand off to a person if not
@@ -20,7 +20,9 @@ spot it  →  explain it  →  fix it (with consent)  →  check it worked  → 
 | PII masking before anything leaves the server | `pakka/pii.py` | Working |
 | Audit log of every intervention (SQLite here, Postgres planned) | `pakka/store.py` | Working |
 | FastAPI service and a demo loan journey page | `app/` | Working |
-| Sarvam Bulbul voice | `pakka/sarvam.py` | Wired up, needs `SARVAM_API_KEY`; the page falls back to browser speech without it |
+| Sarvam Bulbul voice and Saaras speech-to-text (en, hi, bn, od, te) | `pakka/sarvam.py` | Wired up, needs `SARVAM_API_KEY`; the page falls back to browser speech without it |
+| Pakka for Merchants: daily-repayment early warning, live payment record, "can't pay today", 5 languages | `pakka/merchant/`, `app/static/merchant.html` | Working (see below) |
+| n8n action layer and Cognee memory | `n8n/`, `pakka/merchant/actions.py`, `pakka/merchant/memory.py` | Optional; simulated or local by default |
 | XGBoost + SHAP stall model | | Planned for the pilot, once real event logs exist |
 | React Native widget inside the Paytm app | | Planned |
 
@@ -97,9 +99,13 @@ python eval/merchant_eval.py     # builds eval/merchant_results.json
 uvicorn app.main:app --reload    # open http://localhost:8000
 ```
 
+With a Sarvam key in `.env`: `uvicorn app.main:app --env-file .env`. If port 8000 is busy (often an older Pakka server still running), use another port, e.g. `--port 8001`, and open that one.
+
 Or with Docker: `docker build -t pakka . && docker run -p 8000:8000 pakka`
 
 To put it online, see [DEPLOY.md](DEPLOY.md): one-click Render Blueprint (`render.yaml`) or Vercel (`vercel.json`).
+
+**Deploying the languages demo on Render:** the branch `languages-demo` has its own blueprint (service `pakka-languages`, deploys only that branch, so `main` and `skip-today` are untouched). Render → **New → Blueprint** → repo `Madhurtandon1/Pakka` → branch `languages-demo` → optionally paste `SARVAM_API_KEY` → **Apply**. The Docker build runs the evals, so a broken safety rule fails the deploy. Free plan: open the site once before a demo so it is awake.
 
 The landing page is at `/`, the loan-journey demo at `/demo` and the merchant demo at `/merchant`. Add `?tour=1` to watch the demo click through itself with captions.
 
@@ -148,7 +154,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-373 tests (plus 32 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
+373 tests (plus 32 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 204 cover Pakka for Merchants and 24 the partners (Sarvam speech-to-text, n8n signing and fallback, memory on/off giving identical decisions). The merchant tests cover ledger modes and SMA boundaries, pay-link payments in the ledger, rules R1–R4, every guard G1–G10, "can't pay today", intents in Hindi, Hinglish, English, Bengali, Odia and Telugu, every template in all five languages, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -165,6 +171,15 @@ pytest -q
 | GET | `/kfs/{term}?lang=` | Plain-language KFS term |
 | POST | `/speak` | Sarvam text-to-speech (needs a key) |
 | GET | `/audit`, `/eval`, `/eval/docs` | Audit log, evaluation results, document-step scenarios |
+| GET | `/merchant/personas` | Demo shops, Soundbox cues and quick-reply phrases in every language |
+| POST | `/merchant/{id}/consent` | Grant consent (DELETE withdraws it, and deletes memory) |
+| POST | `/merchant/{id}/simulate` | Run the day end for a given day and time |
+| POST | `/merchant/{id}/reply` | The owner's reply (any of the five languages); returns the action and the message in every language |
+| POST | `/merchant/{id}/reply/voice?lang=` | Sarvam speech-to-text; returns a masked transcript for the owner to check (never sent by itself) |
+| POST | `/merchant/{id}/pay` | Demo stand-in for a UPI payment through the pay link; the lender's ledger records it |
+| GET | `/merchant/{id}/ledger` | The lender's payment record, with what happened each day (replies, Pakka's actions, payments) |
+| POST | `/merchant/{id}/callbacks` | Book a call with a person, only inside the shop's contact hours |
+| GET | `/merchant/actions`, `/merchant/lender/queue`, `/merchant/{id}/memory`, `/merchant/partners` | Actions handed to n8n, the people queue, memory, and what is live or simulated |
 
 ## Loan document steps (Journey A)
 
@@ -204,9 +219,16 @@ The status strip on `/merchant` shows what is live and what is simulated, and th
 ## What's next
 
 1. Pilot on one Paytm journey (personal-loan KYC, Hindi) with a control group
-2. Train XGBoost on real event logs, keep the rules as a fallback
-3. App widget, KFS explainer on the offer screen, more languages through Sarvam
-4. Postgres, Redis event stream, and consent records in production
+2. Native-speaker review of every Bengali, Odia and Telugu string (all marked "needs native review"), then extend the loan journey's explanations to the same languages
+3. Train XGBoost on real event logs, keep the rules as a fallback
+4. App widget, KFS explainer on the offer screen
+5. Postgres, Redis event stream, and consent records in production
+
+**Proposed for the demo, not built yet:**
+- **Reply in the language the owner uses:** a Telugu or Bengali reply (typed, or spoken through Sarvam, which reports the language it heard) gets the reviewed reply in that language, and the phone switches to it.
+- **Whole page translated with Sarvam:** one selector translates the lender view, stories, tour and help text, from a pre-translated cache shipped with the code (works offline, no per-visit cost), marked "Translated by Sarvam". Messages to the shop owner stay as the reviewed templates; they are never machine-translated on the fly.
+- **WhatsApp view (simulated):** the same reviewed message shown as a WhatsApp chat, only with consent and inside contact hours; through n8n it would send only a template id (the SMS/WhatsApp node in `n8n/pakka_workflow.json` is disabled today).
+- **Loan demo resets:** a reset on every field (PAN, names, Aadhaar, OTP, account, IFSC) and a "Reset this step" button, so a demo "things that go wrong" button can be undone without restarting the whole application. Today only **Restart** at the top exists.
 
 ## Pakka for Merchants
 
@@ -221,8 +243,8 @@ Open `/merchant`, or `/merchant?tour=1` for the guided tour.
 | Pakka may | Only the lender may |
 |---|---|
 | Spot a shortfall or a sales dip from the lender's ledger | Calculate dues, penal charges or interest |
-| Send a neutral Soundbox cue and an app card, in EN/HI | Approve a lower deduction, a new date, a restructure or a waiver |
-| Send a UPI pay link to the **lender's** account | Approve any new credit |
+| Send a neutral Soundbox cue and an app card, in EN, HI, BN, OD or TE | Approve a lower deduction, a new date, a restructure or a waiver |
+| Send a UPI pay link to the **lender's** account (in the demo, a simulated payment the lender's ledger records) | Approve any new credit |
 | Set a reminder or a callback inside contact hours | Decide anything about the loan |
 | Route a request to the lender as `pending_lender_decision` | |
 | Hand off to a person, with the grievance officer | |
@@ -235,15 +257,16 @@ Open `/merchant`, or `/merchant?tour=1` for the guided tour.
 | G2 | Proactive contact only inside the merchant's chosen hours (never wider than 08:00–19:00); otherwise deferred |
 | G3 | At most one proactive contact a day, and during a shortfall only every other day unless the SMA bucket worsens |
 | G4 | No new-credit offer while dues exist or within 90 days of a stress flag |
-| G5 | The Soundbox plays only the neutral cue: no amounts, no "overdue", no loan words |
+| G5 | The Soundbox plays only the neutral cue: no amounts, no "overdue", no loan words (in all five languages) |
 | G6 | Actions outside the lender's `allowed_actions` go to a person, with `policy_ok = false` |
 | G7 | The third attempt in an episode goes to a person |
 | G8 | Dispute, hardship (including bereavement, illness, weddings, flood and other calamities) or "already paid" stops the episode and goes to a person |
 | G9 | Decision actions (approve, waive, reschedule now…) raise `PolicyViolation` |
+| G10 | "Can't pay today" is explained as a carry-forward only where the lender allows it and within its limit; otherwise it goes to the lender or a person |
 
-The LLM never picks an action. It only labels the merchant's reply as one of nine fixed intents, after PII masking. Distress keywords always override it, and any unknown label becomes `unclear`. With no LLM configured (the default), an offline keyword classifier covering Hindi, Hinglish and English is used, so the demo needs no keys. Optional LLM providers, none required by the Docker image. Without `PAKKA_LLM_PROVIDER` the classifier stays on the offline keyword fail-safe.
+The LLM never picks an action. It only labels the merchant's reply as one of ten fixed intents, after PII masking. Distress keywords always override it, and any unknown label becomes `unclear`. With no LLM configured (the default), an offline keyword classifier covering Hindi, Hinglish, English, Bengali, Odia and Telugu is used, so the demo needs no keys. Optional LLM providers, none required by the Docker image. Without `PAKKA_LLM_PROVIDER` the classifier stays on the offline keyword fail-safe.
 
-**Languages (merchant side): English, Hindi, Bengali, Odia, Telugu.** Every merchant message, the permission notice, the quick-reply buttons, the Soundbox cue and the offline safety word lists (distress first) exist in all five. The Bengali, Odia and Telugu text is in `pakka/merchant/lang_pack.py` and **every line is marked "needs native review"**. With a Sarvam key, voice in (Saaras) and out (Bulbul) use `bn-IN`, `od-IN` and `te-IN`; without one the browser's voice is used. The live demo adds one shop per new language (Das Mishti Bhandar, Mohanty Tiffin Centre, Lakshmi Saree Centre), only with `demo=True`, so the evals and blind sets are unchanged. The G5 Soundbox word list also blocks loan words in the three languages.
+**Languages (merchant side): English, Hindi, Bengali, Odia, Telugu.** Every merchant message, the permission notice, the quick-reply buttons, the Soundbox cue and the offline safety word lists (distress first) exist in all five. The Bengali, Odia and Telugu text is in `pakka/merchant/lang_pack.py` and **every line is marked "needs native review"**. With a Sarvam key, voice in (Saaras) and out (Bulbul) use `bn-IN`, `od-IN` and `te-IN`; without one the browser's voice is used. The live demo adds one shop per new language (Das Mishti Bhandar, Mohanty Tiffin Centre, Lakshmi Saree Centre), only with `demo=True`, so the evals and blind sets are unchanged. Picking one of them switches the phone to its language; the toggle (EN · हिंदी · বাংলা · ଓଡ଼ିଆ · తెలుగు) shows the same message in any language. The G5 Soundbox word list also blocks loan words in the three languages. Whole-word matching covers every Indic script, so "না" (no) doesn't match inside "জানা" (know). On blind v1, not one keyword label changed.
 
 **Switch on Sarvam:** `pip install sarvamai`, then put these two lines in `.env` (which is git-ignored):
 ```
@@ -281,10 +304,11 @@ The blind run exposed four general gaps. There were no financial-distress words 
 | Intent → action policy | `pakka/merchant/policy.json` |
 | Guards G1–G9 | `pakka/merchant/guard.py` |
 | Intent classifier (keywords, optional LLM) | `pakka/merchant/intents.py` |
-| Reviewed EN/HI templates | `pakka/merchant/templates.py` |
+| Reviewed templates (EN/HI) | `pakka/merchant/templates.py` |
+| Bengali, Odia, Telugu: templates, cue, notes, months, keywords, quick replies (needs native review) | `pakka/merchant/lang_pack.py` |
 | LangGraph agent: day-end, reply and offer paths | `pakka/merchant/agent.py` |
 | Consent, episodes, lender requests, `merchant_audit` | `pakka/merchant/store.py` |
-| Five personas + 200 random merchants | `pakka/merchant/synth.py` |
+| Six personas (+ three demo-only language shops) and 200 random merchants | `pakka/merchant/synth.py` |
 | API under `/merchant/...` | `app/merchant_api.py` |
 | Consent screen, Soundbox mock, app card, lender view, tour | `app/static/merchant.html` |
 
@@ -299,6 +323,15 @@ The blind run exposed four general gaps. There were no financial-distress words 
 | `mobile_dispute` | Demo Bank B holds partial deductions as prepayment, so day 8 shows ₹600 due despite a ₹400 deduction. "Maine already pay kiya" means a handoff. Asking for a lower deduction is outside this lender's scope (G6), so that goes to a person too |
 | `general_late_night` | Shortfall detected at 21:30, deferred to 08:00 (G2) |
 | `fruit_cart` (Verma Fruit Cart) | Slow days 5, 6 and 7. "Can't pay today" each day: the lender's carry-forward is explained twice (stress flag on the 2nd), then a callback with a person is booked and shows in the lender view |
+| `sweets_kolkata` (Das Mishti Bhandar, Bengali, demo only) | Day 4 falls short by ₹250, day 5 the shop is shut. Notice, card, quick replies and cue in Bengali |
+| `tiffin_cuttack` (Mohanty Tiffin Centre, Odia, demo only) | Day 5 is short; Demo Bank B holds part-payments, so "can't pay today" is routed to the lender |
+| `saree_vijayawada` (Lakshmi Saree Centre, Telugu, demo only) | Sales dip on days 3, 4 and 5 |
+
+### Live payment record
+
+Anything the owner does shows up straight away in the lender's payment record, on that day's row, under **What happened**:
+- **Spontaneous replies, any day:** type or say "aaj nahi dunga" (or a reply in any of the five languages) on any day, even one already covered, and the row shows "Owner: can't pay today → …". Only the label is shown, never the owner's words. On a covered day Pakka says so ("nothing is pending today").
+- **Payments through the pay link:** tapping **Pay via UPI** on the card offers a simulated UPI payment to the lender. The lender's ledger books it the lender's way (FIFO carry-forward, or held as credit for a prepayment lender), so **Total due** drops, the row shows "₹400 received via pay link", and the owner gets a confirmation with the lender's new figure ("You're all caught up" when it reaches zero).
 
 ### "Can't pay today"
 
@@ -330,7 +363,7 @@ The blind run exposed four general gaps. There were no financial-distress words 
 
 These numbers show the rules and guards behave as designed on synthetic data, nothing more. R1 is checked against the same ledger it reads, and the reply samples were written alongside the keyword lists. Real impact needs a pilot with a randomised holdout, measuring day-0 and day-7 cure rate, the SMA-0 → SMA-1 roll rate, Bucket-1 resolution, complaint rate, opt-out rate and promises to pay kept.
 
-**Not built (on purpose, for now):** server-side speech-to-text (the page uses the browser's Web Speech API and posts text), penal-charge calculation, restructuring logic, outbound calls, and any real Paytm or lender integration.
+**Not built (on purpose, for now):** penal-charge calculation, restructuring logic, outbound calls, real UPI payments, and any real Paytm or lender integration. Server-side speech-to-text is optional, through Sarvam; without a key the page uses the browser's Web Speech API.
 
 ### Backup demo recording
 
