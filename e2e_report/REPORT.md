@@ -1,6 +1,6 @@
 # Merchant UI test report
 
-Run: 31 Oct 2026 12:40 · target: local app, offline (no LLM, no Sarvam key) · **31 / 31 scenarios passed**
+Run: 31 Oct 2026 14:17 · target: local app, offline (no LLM, no Sarvam key) · **32 / 32 scenarios passed**
 
 | # | Scenario | Result | Notes |
 |---|---|---|---|
@@ -35,16 +35,17 @@ Run: 31 Oct 2026 12:40 · target: local app, offline (no LLM, no Sarvam key) · 
 | 22a | 22. Partners offline: status strip, simulated actions, people queue, memory and recall lines | ✅ pass |  |
 | 22b | 22. Sarvam speech-to-text path: recorded audio → transcript in the box, not sent until Send | ✅ pass |  |
 | 23 | 23. Spontaneous replies on any day and pay-link payments show up live in the lender's payment record | ✅ pass |  |
+| 24 | 24. A Bengali shop: notice, card, quick replies and voice in Bengali; the same card in Odia and Telugu | ✅ pass |  |
 
 ## Console errors
 
 - None (apart from the expected ones below).
-- Expected offline: 40 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
+- Expected offline: 41 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
 
 ## Failed network requests
 
 - None unexpected.
-- Expected offline: 40 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
+- Expected offline: 41 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
 
 ## Bugs found and fixed
 
@@ -62,7 +63,7 @@ Run: 31 Oct 2026 12:40 · target: local app, offline (no LLM, no Sarvam key) · 
 - Cadence: the person takes over on the 4th proactive contact (days 15, 17, 19 messaged; day 21 → person). The feature doc and README say "the third attempt goes to a person"; the code hands off after three attempts. The wording should say "after three messages". A worsening overdue stage (SMA-0 → SMA-1) can't be reached in the 30-day demo; it is covered by the unit tests.
 - The audit chip for that handover reads "Third try, so a person takes over" although it is the 4th contact.
 
-## Screenshots (61)
+## Screenshots (63)
 
 Saved in `e2e_report/`:
 
@@ -127,3 +128,5 @@ Saved in `e2e_report/`:
 - 22b_sarvam_voice_path_01_sarvam_transcript.png
 - 23_live_replies_and_payments_in_the_record_01_spontaneous_reply_recorded.png
 - 23_live_replies_and_payments_in_the_record_02_payment_recorded.png
+- 24_bengali_odia_telugu_01_bengali_card.png
+- 24_bengali_odia_telugu_02_odia_card.png

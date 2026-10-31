@@ -23,7 +23,8 @@ from .ledger import simulate
 from .models import ConsentRecord, LedgerDay, MerchantRescue
 from .store import MerchantStore
 from .synth import Persona, personas
-from .templates import OPTIONS, REQUEST_NAMES, SOUNDBOX_CUE, fmt_date, render_both, rupees
+from . import lang_pack as lp
+from .templates import LANGS, OPTIONS, REQUEST_NAMES, SOUNDBOX_CUE, fmt_date, render_all, rupees
 
 SMA_ORDER = {"standard": 0, "SMA-0": 1, "SMA-1": 2, "SMA-2": 3, "NPA": 4}
 ROUTED = {"route_lower_deduction_request", "route_reschedule_request", "human_handoff",
@@ -65,6 +66,7 @@ class State(TypedDict, total=False):
     template_id: Optional[str]
     message_en: str
     message_hi: str
+    messages: dict
     cue: Optional[str]
     channel: str
     g5_blocks: list[str]
@@ -188,7 +190,7 @@ def _render(s: State) -> State:
     if action == "no_action" and blocker == "cured" and "G1_consent" not in v.blocks:
         tid = "T_CURED"
     if not tid:
-        return {"template_id": None, "message_en": "", "message_hi": "", "cue": None}
+        return {"template_id": None, "message_en": "", "message_hi": "", "messages": {}, "cue": None}
 
     def upi(paise: int) -> str:
         return f"upi://pay?pa={lender.vpa}&pn={quote(lender.lender_name)}&am={paise / 100:.2f}&tn={p.loan.loan_id}"
@@ -200,22 +202,23 @@ def _render(s: State) -> State:
     days = rules.THRESHOLDS["dip_window_days"]
     avg = sum(d.settlement_paise for d in f.ledger[-days:]) // max(1, len(f.ledger[-days:])) // 100 * 100
     by_lang = {}
-    for lang in ("en", "hi"):
+    for lang in LANGS:
         by_lang[lang] = {
             "lender": lender.lender_name, "shortfall": rupees(today.shortfall_today_paise),
-            "overdue": rupees(today.total_overdue_paise), "penal_note": lender.penal_charges_note[lang],
+            "overdue": rupees(today.total_overdue_paise),
+            "penal_note": lender.penal_charges_note.get(lang) or lp.PENAL_NOTE[lang],
             "oldest": fmt_date(today.oldest_unpaid_date or today.day, lang),
             "amount": rupees(amount), "link": link,
             "short_amount": rupees(today.shortfall_today_paise), "short_link": upi(today.shortfall_today_paise), "time": f"{when:%H:%M}", "date": fmt_date(when, lang),
             "request": REQUEST_NAMES.get(action, {}).get(lang, ""), "officer": lender.grievance_officer,
             "window": days, "avg": rupees(avg), "edi": rupees(p.loan.edi_paise),
-            "charges_note": getattr(lender.skip_day_policy, f"charges_note_{lang}"),
+            "charges_note": getattr(lender.skip_day_policy, f"charges_note_{lang}", None) or lp.CHARGES_NOTE[lang],
         }
         if action == "acknowledge_carry_forward":      # "pay part now": today's gap, or the EDI if none yet
             by_lang[lang]["link"] = upi(today.shortfall_today_paise or p.loan.edi_paise)
-    en, hi = render_both(tid, by_lang)
+    msgs = render_all(tid, by_lang)
     cue = SOUNDBOX_CUE[p.merchant.language] if v.channel == "soundbox_cue" else None
-    return {"template_id": tid, "message_en": en, "message_hi": hi, "cue": cue}
+    return {"template_id": tid, "message_en": msgs["en"], "message_hi": msgs["hi"], "messages": msgs, "cue": cue}
 
 
 def _soundbox(s: State) -> State:
@@ -247,7 +250,7 @@ def _audit(s: State) -> State:
     slots = callback_slots(f) if delivered and v.action == "human_callback_booking" else []
 
     lang = p.merchant.language
-    message = s["message_hi"] if lang == "hi" else s["message_en"]
+    message = s.get("messages", {}).get(lang, "")
     consent = f.consent if f.consent and f.consent.active else None
     f.store.log({
         "ts": f.now.isoformat(), "merchant_id": f.mid, "loan_id": p.loan.loan_id,
@@ -267,7 +270,7 @@ def _audit(s: State) -> State:
         intent_source=s.get("intent_source", "none"), action=v.action,
         needs_consent=policy.needs_consent(v.action), escalated=v.escalated, policy_ok=v.policy_ok,
         guard_blocks=blocks, channel=channel, template_id=s.get("template_id"),
-        message_en=s["message_en"], message_hi=s["message_hi"],
+        message_en=s["message_en"], message_hi=s["message_hi"], messages=s.get("messages", {}),
         options=OPTIONS.get(s.get("template_id"), []) if delivered else [],
         soundbox_cue_text=s.get("cue"), lender_request_id=request_id, scheduled_for=v.scheduled_for,
         callback_slots=slots, skip_requests_30d=s.get("skip_requests_30d", 0))
@@ -360,9 +363,10 @@ class Desk:
                 tid, extra = hit
                 vals = {lang: {"lender": p.lender.lender_name,
                                "request": REQUEST_NAMES.get(extra.get("request_action"), {}).get(lang, "")}
-                        for lang in ("en", "hi")}
+                        for lang in LANGS}
                 rescue.recall_template_id = tid
-                rescue.recall_en, rescue.recall_hi = render_both(tid, vals)
+                rescue.recall = render_all(tid, vals)
+                rescue.recall_en, rescue.recall_hi = rescue.recall["en"], rescue.recall["hi"]
         memory.remember(self.store, mid, now.date(), rescue)
         # Partner action layer: only a final, delivered action. Deferred ones go when delivered.
         if delivered and rescue.action != "no_action":
@@ -396,16 +400,17 @@ class Desk:
         after = self.ledger(merchant_id, day)[-1]
         tid = "T_PAYMENT_ALL_CLEAR" if after.total_overdue_paise == 0 else "T_PAYMENT_RECEIVED"
         vals = {lang: {"lender": p.lender.lender_name, "amount": rupees(amount),
-                       "overdue": rupees(after.total_overdue_paise)} for lang in ("en", "hi")}
-        en, hi = render_both(tid, vals)
+                       "overdue": rupees(after.total_overdue_paise)} for lang in LANGS}
+        msgs = render_all(tid, vals)
         self.store.log({"ts": now.isoformat(), "merchant_id": merchant_id, "loan_id": p.loan.loan_id,
                         "blocker": "payment", "rule_ids": [], "intent": None, "intent_source": "none",
                         "action": "no_action", "template_id": tid, "channel": "app_card", "guard_blocks": [],
                         "policy_ok": 1, "escalated": 0, "language": p.merchant.language, "proactive": 0,
-                        "message": hi if p.merchant.language == "hi" else en})
+                        "message": msgs[p.merchant.language]})
         if after.total_overdue_paise == 0 and memory.consented(self.store, merchant_id):
             self.store.memory_add(merchant_id, now.date(), "paid_up", "{}")
-        return {"template_id": tid, "message_en": en, "message_hi": hi, "paid_paise": amount,
+        return {"template_id": tid, "message_en": msgs["en"], "message_hi": msgs["hi"], "messages": msgs,
+                "paid_paise": amount,
                 "total_due_paise": after.total_overdue_paise, "ledger_day": after}
 
     def book_callback(self, merchant_id: str, slot: datetime, now: datetime | None = None) -> dict:
@@ -420,8 +425,8 @@ class Desk:
         appt = self.store.add_appointment(merchant_id, p.loan.loan_id, p.lender.lender_id, slot,
                                           reminder_at=slot, at=now, reason="can't pay today, repeatedly")
         vals = {lang: {"lender": p.lender.lender_name, "time": f"{slot:%H:%M}", "date": fmt_date(slot, lang)}
-                for lang in ("en", "hi")}
-        en, hi = render_both("T_CALLBACK_BOOKED", vals)
+                for lang in LANGS}
+        msgs = render_all("T_CALLBACK_BOOKED", vals)
         data = actions.payload(merchant_id=merchant_id, at=now, action="schedule_callback",
                                template_id="T_CALLBACK_BOOKED", language=p.merchant.language, scheduled_for=slot,
                                lender_id=p.lender.lender_id)
@@ -430,9 +435,9 @@ class Desk:
                         "blocker": "reply", "rule_ids": [], "intent": None, "intent_source": "none",
                         "action": "schedule_callback", "template_id": "T_CALLBACK_BOOKED", "channel": "app_card",
                         "guard_blocks": [], "policy_ok": 1, "escalated": 1, "language": p.merchant.language,
-                        "proactive": 0, "message": hi if p.merchant.language == "hi" else en,
+                        "proactive": 0, "message": msgs[p.merchant.language],
                         "scheduled_for": slot.isoformat()})
-        return {**appt, "message_en": en, "message_hi": hi}
+        return {**appt, "message_en": msgs["en"], "message_hi": msgs["hi"], "messages": msgs}
 
     def check_offer(self, merchant_id: str, now: datetime | None = None, day: int | None = None) -> MerchantRescue:
         day = day or self.store.sim_day(merchant_id)

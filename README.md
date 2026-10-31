@@ -148,7 +148,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-341 tests (plus 30 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
+373 tests (plus 32 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -242,6 +242,8 @@ Open `/merchant`, or `/merchant?tour=1` for the guided tour.
 | G9 | Decision actions (approve, waive, reschedule now…) raise `PolicyViolation` |
 
 The LLM never picks an action. It only labels the merchant's reply as one of nine fixed intents, after PII masking. Distress keywords always override it, and any unknown label becomes `unclear`. With no LLM configured (the default), an offline keyword classifier covering Hindi, Hinglish and English is used, so the demo needs no keys. Optional LLM providers, none required by the Docker image. Without `PAKKA_LLM_PROVIDER` the classifier stays on the offline keyword fail-safe.
+
+**Languages (merchant side): English, Hindi, Bengali, Odia, Telugu.** Every merchant message, the permission notice, the quick-reply buttons, the Soundbox cue and the offline safety word lists (distress first) exist in all five. The Bengali, Odia and Telugu text is in `pakka/merchant/lang_pack.py` and **every line is marked "needs native review"**. With a Sarvam key, voice in (Saaras) and out (Bulbul) use `bn-IN`, `od-IN` and `te-IN`; without one the browser's voice is used. The live demo adds one shop per new language (Das Mishti Bhandar, Mohanty Tiffin Centre, Lakshmi Saree Centre), only with `demo=True`, so the evals and blind sets are unchanged. The G5 Soundbox word list also blocks loan words in the three languages.
 
 **Switch on Sarvam:** `pip install sarvamai`, then put these two lines in `.env` (which is git-ignored):
 ```

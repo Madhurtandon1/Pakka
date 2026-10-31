@@ -11,6 +11,7 @@ from typing import Literal
 
 from pakka.pii import mask
 
+from . import lang_pack as lp
 from .models import ALL_INTENTS, DISTRESS
 
 log = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ KEYWORDS: list[tuple[str, list[str]]] = [
                         "अभी", "आज"]),
 ]
 
+# Bengali, Odia and Telugu words (lang_pack), added to the same lists in the same order.
+KEYWORDS = [(label, words + lp.KEYWORDS.get(label, [])) for label, words in KEYWORDS]
+
 # Fail safe: when unsure, Pakka routes to a person, never to a payment nudge.
 # A reply becomes will_pay_* only with a time word AND a payment verb AND no negation.
 # Negation together with a money or sales word is hardship. Anything else is unclear, which goes to a person.
@@ -69,6 +73,9 @@ MONEY_WORDS = ["paise", "paisa", "paison", "pese", "cash", "money", "bikri", "sa
                "kamai", "income", "business", "grahak", "पैसे", "पैसा", "पैसों", "नकद", "कैश", "बिक्री", "धंधा",
                "धंधे", "कमाई", "ग्राहक", "बिक्री"]
 PAY_INTENTS = {"will_pay_today", "will_pay_later"}
+PAY_VERBS += lp.PAY_VERBS
+NEGATIONS += lp.NEGATIONS
+MONEY_WORDS += lp.MONEY_WORDS
 
 # "Can't pay today": a reply is request_skip_today only with BOTH
 #   (1) a skip marker: "skip", "kal se" (from tomorrow), or a today-word together with a negation or "adjust"
@@ -77,12 +84,12 @@ PAY_INTENTS = {"will_pay_today", "will_pay_later"}
 # "negation + money word -> hardship" rule comes after it.
 SKIP_WORDS = ["skip", "chhod do", "chod do", "छोड़ दो"]
 FROM_TOMORROW = ["kal se", "कल से", "from tomorrow"]
-TODAY_WORDS = ["aaj", "today", "आज"]
+TODAY_WORDS = ["aaj", "today", "आज"] + lp.TODAY_WORDS
 ADJUST_WORDS = ["adjust", "एडजस्ट", "carry forward", "aage kar"]
 # The second marker must be about the lender taking or adjusting it ("kaat lena", "take it", "adjust").
 # A tomorrow-word alone isn't enough: "aaj nahi, kal kar dunga" means "I'll pay tomorrow", not a skip request.
 LATER_MARKERS = ["kaat", "kat lena", "kat lo", "katna", "deduct", "take it", "le lena", "le lo", "काट",
-                 "कटौती"] + ADJUST_WORDS + SKIP_WORDS
+                 "कटौती"] + ADJUST_WORDS + SKIP_WORDS + lp.DEDUCT_WORDS
 
 LABELS = {
     "will_pay_today": "will pay today or right now",
@@ -99,7 +106,7 @@ LABELS = {
 
 SYSTEM_PROMPT = (
     "You label one reply from a small shop owner in India about their daily loan instalment. "
-    "The reply may be in Hindi, English or Hinglish. Return only one label from this list, nothing else:\n"
+    "The reply may be in Hindi, English, Hinglish, Bengali, Odia or Telugu. Return only one label from this list, nothing else:\n"
     + "\n".join(f"{k}: {v}" for k, v in LABELS.items())
     + "\nExamples: 'kal de dunga' -> will_pay_later; 'I'll pay tomorrow' -> will_pay_later; "
       "'abhi bhar raha hoon' -> will_pay_today; 'paying now' -> will_pay_today; "
@@ -129,7 +136,8 @@ def _prefix(word: str) -> re.Pattern:
 def _neg(word: str) -> re.Pattern:
     if word.isascii():
         return re.compile(rf"(?<![a-z']){re.escape(word)}(?![a-z'])")
-    return re.compile(rf"(?<![\u0900-\u097F]){re.escape(word)}(?![\u0900-\u097F])")   # whole Devanagari word
+    # whole word in any Indic script (Devanagari, Bengali, Odia, Telugu, ...), so "\u09A8\u09BE" doesn't match inside "\u099C\u09BE\u09A8\u09BE"
+    return re.compile(rf"(?<![\u0900-\u0DFF]){re.escape(word)}(?![\u0900-\u0DFF])")
 
 
 _PAY_VERBS = [_prefix(w) for w in PAY_VERBS]
@@ -141,9 +149,9 @@ _LATER = [_prefix(w) for w in LATER_MARKERS]
 # Also a skip request: "aaj nahi dunga" / "can't pay today" (today + not + a pay verb), but only with no
 # later-time word; "aaj nahi, kal kar dunga" is a promise to pay, not a skip (it stays unclear -> a person).
 CANT_PAY = PAY_VERBS + ["de paunga", "de paoonga", "de sakta", "de sakunga", "bhar paunga", "kar paunga",
-                        "दे पाऊँगा", "दे पाऊंगा", "भर पाऊँगा", "भर पाऊंगा", "कर पाऊँगा"]
+                        "दे पाऊँगा", "दे पाऊंगा", "भर पाऊँगा", "भर पाऊंगा", "कर पाऊँगा"] + lp.CANT_PAY
 LATER_TIME = ["kal", "tomorrow", "कल", "parso", "parson", "परसों", "next week", "agle hafte", "subah", "सुबह",
-              "baad mein", "baad me", "बाद में", "later"]
+              "baad mein", "baad me", "बाद में", "later"] + lp.LATER_TIME
 _CANT_PAY = [_prefix(w) for w in CANT_PAY]
 _LATER_TIME = [_compile(w) for w in LATER_TIME]
 _NEGATIONS = [_neg(w) for w in NEGATIONS]

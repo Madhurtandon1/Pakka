@@ -7,7 +7,7 @@ from pakka.merchant.guard import GuardContext, guard, soundbox_guard, soundbox_s
 from pakka.merchant.models import ConsentRecord
 from pakka.merchant.policy import PolicyViolation
 from pakka.merchant.synth import LENDERS, personas
-from pakka.merchant.templates import SOUNDBOX_CUE, TEMPLATES
+from pakka.merchant.templates import LANGS, SOUNDBOX_CUE, TEMPLATES
 
 P = personas()["chai_seasonal"]
 NOW = datetime(2026, 10, 10, 18, 0)
@@ -96,9 +96,9 @@ def test_soundbox_channel_needs_a_device_and_consent():
     assert guard("send_pay_link", ctx(proactive=False)).channel == "app_card"
 
 
-def test_templates_are_bilingual_and_hold_no_computed_amounts():
+def test_templates_cover_every_language_and_hold_no_computed_amounts():
     for tid, t in TEMPLATES.items():
-        assert set(t) == {"en", "hi"}, tid
+        assert set(t) == set(LANGS) == {"en", "hi", "bn", "od", "te"}, tid
         for text in t.values():
             static = re.sub(r"\{\w+\}", "", text)
             assert not re.search(r"[\d₹%]", static), (tid, text)

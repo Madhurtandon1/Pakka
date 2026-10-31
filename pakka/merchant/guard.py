@@ -13,7 +13,11 @@ DECISION_ACTIONS = {"approve_loan", "approve_credit", "waive_charges", "waive_pe
                     "reschedule_now", "restructure_loan", "change_due_date", "reject_loan"}
 
 SOUNDBOX_BLOCKLIST = ["overdue", "bakaya", "baki", "loan", "emi", "edi", "₹", "rs", "rupaye", "rupee",
-                      "rupees", "paise", "due", "kist", "किस्त", "बकाया", "लोन", "रुपये", "penalty"]
+                      "rupees", "paise", "due", "kist", "किस्त", "बकाया", "लोन", "रुपये", "penalty",
+                      # Bengali, Odia, Telugu: loan, dues, instalment, money (needs native review)
+                      "ঋণ", "লোন", "বকেয়া", "বাকি", "কিস্তি", "টাকা",
+                      "ଋଣ", "ଲୋନ", "ବକେୟା", "ବାକି", "କିସ୍ତି", "ଟଙ୍କା",
+                      "రుణం", "లోన్", "బకాయి", "వాయిదా", "రూపాయ", "డబ్బు"]
 
 
 @dataclass

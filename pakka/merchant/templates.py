@@ -4,6 +4,10 @@ Every amount in a message is a lender ledger figure passed in as a placeholder.
 """
 from datetime import date, datetime
 
+from . import lang_pack as lp
+
+LANGS = ("en", "hi") + lp.NEW_LANGS       # English, Hindi, Bengali, Odia, Telugu
+
 SOUNDBOX_CUE = {
     "en": "You have an important message in your Paytm for Business app.",
     "hi": "Paytm for Business app mein aapke liye ek zaroori sandesh hai.",
@@ -123,11 +127,20 @@ TEMPLATES = {
     },
 }
 
+# Bengali, Odia and Telugu (lang_pack.py, needs native review): same ids, same placeholders.
+SOUNDBOX_CUE.update(lp.SOUNDBOX_CUE)
+for _tid, _texts in lp.TEMPLATES.items():
+    if _tid != "T_SB_CUE":
+        TEMPLATES[_tid].update(_texts)
+
 REQUEST_NAMES = {
     "route_lower_deduction_request": {"en": "a lower daily deduction", "hi": "कम रोज़ाना कटौती"},
     "route_reschedule_request": {"en": "a new repayment date", "hi": "नई भुगतान तारीख"},
     "route_skip_request": {"en": "more time on one day's payment", "hi": "एक दिन की रकम के लिए समय"},  # HI: needs native review
 }
+
+for _action, _names in lp.REQUEST_NAMES.items():
+    REQUEST_NAMES[_action].update(_names)
 
 OPTIONS = {
     "T_SHORTFALL": ["pay_today", "pay_later", "skip_today", "lower_deduction", "reschedule", "callback", "already_paid"],
@@ -158,8 +171,11 @@ def rupees(paise: int) -> str:
 HI_MONTHS = ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"]
 
 
+MONTHS = {"hi": HI_MONTHS, **lp.MONTHS}
+
+
 def fmt_date(d: date | datetime, lang: str = "en") -> str:
-    return f"{d.day} {HI_MONTHS[d.month - 1]}" if lang == "hi" else f"{d.day} {d:%b}"
+    return f"{d.day} {MONTHS[lang][d.month - 1]}" if lang in MONTHS else f"{d.day} {d:%b}"
 
 
 def render(template_id: str, lang: str, **values) -> str:
@@ -168,3 +184,8 @@ def render(template_id: str, lang: str, **values) -> str:
 
 def render_both(template_id: str, values_by_lang: dict[str, dict]) -> tuple[str, str]:
     return tuple(render(template_id, lang, **values_by_lang[lang]) for lang in ("en", "hi"))
+
+
+def render_all(template_id: str, values_by_lang: dict[str, dict]) -> dict[str, str]:
+    """The message in every supported language, from the same lender figures."""
+    return {lang: render(template_id, lang, **values_by_lang[lang]) for lang in LANGS}

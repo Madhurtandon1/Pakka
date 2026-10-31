@@ -693,3 +693,32 @@ def test_23_live_replies_and_payments_in_the_record(ui):
     ui.shot("payment_recorded")
     ui.run(11)
     ui.see("#card", "up to date")
+
+
+def test_24_bengali_odia_telugu(ui):
+    """24. A Bengali shop: notice, card, quick replies and voice in Bengali; the same card in Odia and Telugu"""
+    ui.open("sweets_kolkata", mic="fake")
+    expect(ui.p.locator('#lang button[data-lang="bn"]')).to_have_class(re.compile(r"\bon\b"))
+    ui.see("#consentView", "অভিযোগ আধিকারিক")                  # the permission notice, in Bengali
+    ui.allow()
+    ui.run(4)                                                    # day 4 falls short by ₹250
+    ui.see("#card", "আজ কম: ₹250")
+    ui.see("#cue", "আপনার Paytm for Business অ্যাপে একটি জরুরি বার্তা আছে।")
+    ui.shot("bengali_card")
+    ui.p.click("[data-opt=skip_today]")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click('[data-reason="low_sales"]')
+    ui.see("#card", "কালকের বিক্রি থেকে")                       # the lender's carry-forward, explained
+    ui.see("#ledgerTbl tr.now", "Owner: can't pay today")
+    assert ui.latest("sweets_kolkata")["language"] == "bn"
+    ui.p.evaluate("window.__transcript='কাল দিয়ে দেব'")       # voice reply in Bengali
+    ui.p.click("#mic")
+    expect(ui.p.locator("#replyText")).to_have_value("কাল দিয়ে দেব")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#send")
+    ui.see("#card", "মনে করিয়ে দেব")
+    ui.p.click('#lang button[data-lang="te"]')
+    ui.see("#card", "గుర్తు చేస్తాను")                           # the same message, in Telugu
+    ui.p.click('#lang button[data-lang="od"]')
+    ui.see("#card", "ମନେ ପକାଇଦେବି")
+    ui.shot("odia_card")

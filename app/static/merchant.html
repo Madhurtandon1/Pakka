@@ -195,7 +195,7 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
   <div class="ctl"><label>Time</label><input type="time" id="clock" value="18:00"></div>
   <button class="pill solid" id="run">Run the day ▶</button>
   <button class="pill" id="next">Next day ▸</button>
-  <div class="seg" id="lang"><button data-lang="en" class="on">EN</button><button data-lang="hi">हिंदी</button></div>
+  <div class="seg" id="lang"><button data-lang="en" class="on">EN</button><button data-lang="hi">हिंदी</button><button data-lang="bn">বাংলা</button><button data-lang="od">ଓଡ଼ିଆ</button><button data-lang="te">తెలుగు</button></div>
   <span class="spacer"></span>
   <label class="techsw"><input type="checkbox" id="tech"> Show technical details</label>
   <a class="pill" href="/merchant?tour=1">▶ Tour</a>
@@ -298,7 +298,7 @@ const REQ={route_skip_request:"Can't pay today",route_lower_deduction_request:"S
 const REQSTATUS={pending_lender_decision:"Waiting for the lender's decision",pending_lender_contact:"The lender will contact them"};
 const plain=k=>tech?k:(PLAIN[k]||k);
 const guardText=b=>tech?b:(GUARD[b.split(/[ :]/)[0]]||b);
-const hh=h=>lang==="hi"?`${h<12?"सुबह":h<16?"दोपहर":"शाम"} ${h>12?h-12:h} बजे`:h===12?"12 pm":h<12?`${h} am`:`${h-12} pm`;  // HI: needs native review
+const hh=h=>["bn","od","te"].includes(lang)?`${String(h).padStart(2,"0")}:00`:lang==="hi"?`${h<12?"सुबह":h<16?"दोपहर":"शाम"} ${h>12?h-12:h} बजे`:h===12?"12 pm":h<12?`${h} am`:`${h-12} pm`;  // HI: needs native review
 
 const T={
   en:{allow:"Allow",notnow:"Not now",withdraw:"Withdraw consent",offers:"View loan offers",offersNo:"Offers unavailable",
@@ -344,9 +344,100 @@ const T={
       other:"Aaj nahi de paunga, kal kaat lena. Kaaran: ",
       pick:"कॉल का समय चुनिए (आपके संपर्क समय में):",booked:"कॉल बुक हो गई"}  // HI: needs native review
 };
+// Bengali, Odia, Telugu phone screen. All of it needs native review. The quick-reply phrases (say) come
+// from the server (lang_pack.SAY), so the buttons send exactly the words the classifier is tested on.
+// BN/OD/TE: needs native review (every string below)
+Object.assign(T,{
+  bn:{allow:"অনুমতি দিন",notnow:"এখন না",withdraw:"সম্মতি ফিরিয়ে নিন",offers:"লোন অফার দেখুন",offersNo:"অফার এখন নেই",
+      placeholder:"বাংলা, হিন্দি বা English-এ উত্তর দিন",quiet:"Pakka থেকে কোনো বার্তা নেই। আপনার কিস্তি ঠিকঠাক চলছে।",
+      deferred:"Pakka-র কাছে বার্তা আছে, কিন্তু অপেক্ষা করবে:",title:"আপনার লোনের জন্য আগাম সতর্কতা",
+      t1:"আগাম সতর্কতা",t1s:"কোনো দিনের বিক্রিতে কিস্তি পুরো না কাটলে জানান",
+      t2:"Soundbox সংকেত",t2s:"শুধু একটি সাধারণ সংকেত। কখনো টাকার অঙ্ক বা লোনের কথা নয়",
+      t3:"লোন অফার",t3s:"কোনো বাকি না থাকলে লোনদাতাদের অফার দেখান",
+      off:"অ্যালার্ট বন্ধ। Pakka আপনার সাথে যোগাযোগ করবে না।",turnOn:"অ্যালার্ট চালু করুন",
+      hours:"যোগাযোগের সময়",hourss:"Pakka কখন যোগাযোগ করতে পারে। কখনো 08:00–19:00-এর বাইরে নয়",hoursNow:"Pakka শুধু এই সময়ে বার্তা দেয়:",reader:"উত্তর বোঝে",
+      permReq:"অনুমতির অনুরোধ",permOff:"অনুমতি ফিরিয়ে নেওয়া হয়েছে",perm:"অনুমতি",listen:"🔊 শুনুন",
+      micNote:"ভয়েস Chrome বা Edge-এ কাজ করে। আপনার ব্রাউজার কথাকে লেখায় বদলায়।",
+      micNo:"এই ব্রাউজারে ভয়েস চলে না। দয়া করে উত্তর টাইপ করুন।",
+      micDenied:"মাইক্রোফোনের অনুমতি পাওয়া যায়নি। ব্রাউজারে মাইক্রোফোন চালু করুন, বা টাইপ করুন।",
+      micErr:"শোনা গেল না। আবার চেষ্টা করুন, বা টাইপ করুন।",micCheck:"শব্দগুলো দেখে নিন, দরকারে বদলান, তারপর ➤ চাপুন।",
+      helpQ:"সাহায্য দরকার? আপনি তবুও আমাদের লিখতে পারেন। এতে অ্যালার্ট চালু হবে না।",
+      helpNoted:"জানা গেল। অ্যালার্ট বন্ধ, তাই Pakka পেমেন্ট নিয়ে আর যোগাযোগ করবে না। সাহায্য চাইলে উপরে অ্যালার্ট চালু করুন।",
+      opt:{pay_today:"এখন দেব",pay_later:"কাল দেব",skip_today:"আজ দিতে পারব না",lower_deduction:"কম কাটা",reschedule:"নতুন তারিখ",callback:"ফোন করুন",already_paid:"আমি দিয়ে দিয়েছি"},
+      skipQ:"আজ দিতে পারবেন না?",why:"কারণ বলতে চান? (জরুরি নয়)",
+      reasons:{low_sales:"বিক্রি কম ছিল",shop_closed:"দোকান বন্ধ ছিল",family_function:"পরিবারে অনুষ্ঠান",bank_problem:"ব্যাংক/UPI সমস্যা",other:"অন্য কিছু",none:"বলতে চাই না"},
+      pick:"কলের সময় বেছে নিন (আপনার যোগাযোগের সময়ের মধ্যে):",booked:"কল বুক হয়েছে",
+      upi:"UPI-তে দিন ↗",linkWord:"পেমেন্ট লিংক",speakNow:"বলুন… থামাতে 🎤 আবার চাপুন",app:"বিজনেস অ্যাপ (ডেমো) · লোন: ",
+      notice:(L,O)=>[`<b>কে:</b> Paytm, ${L}-এর পক্ষে লোন সেবা প্রদানকারী (LSP)। লোন দিয়েছে ${L}।`,
+        `<b>উদ্দেশ্য:</b> কোনো দিনের বিক্রিতে রোজকার কিস্তি পুরো না কাটলে আগে জানানো, আর উত্তর দিতে সাহায্য করা।`,
+        `<b>কোন ডেটা:</b> শুধু আপনার রোজকার সেটলমেন্টের মোট আর ${L}-এর পরিশোধের হিসাব। আপনার গ্রাহকদের তথ্য নয়।`,
+        `<b>কে কী পাবে:</b> আপনি যে অনুরোধ পাঠাবেন (কম কাটা, নতুন তারিখ, কল) শুধু সেটাই ${L} পাবে। মার্কেটিংয়ের জন্য কিছু শেয়ার হবে না।`,
+        `<b>কতদিন:</b> লোন চলাকালীন, আর আইন যতদিন বলে।`,
+        `<b>ফিরিয়ে নেওয়া:</b> যেকোনো সময়, এক ট্যাপে "সম্মতি ফিরিয়ে নিন"। এতে আপনার লোনে কোনো প্রভাব পড়বে না।`,
+        `<b>অভিযোগ আধিকারিক:</b> ${O}`]},
+  od:{allow:"ଅନୁମତି ଦିଅନ୍ତୁ",notnow:"ଏବେ ନୁହେଁ",withdraw:"ସମ୍ମତି ଫେରାନ୍ତୁ",offers:"ଲୋନ ଅଫର ଦେଖନ୍ତୁ",offersNo:"ଅଫର ଏବେ ନାହିଁ",
+      placeholder:"ଓଡ଼ିଆ, ହିନ୍ଦୀ କିମ୍ବା English ରେ ଉତ୍ତର ଦିଅନ୍ତୁ",quiet:"Pakka ଠାରୁ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ। ଆପଣଙ୍କ କିସ୍ତି ଠିକ୍ ଚାଲିଛି।",
+      deferred:"Pakka ପାଖରେ ବାର୍ତ୍ତା ଅଛି, କିନ୍ତୁ ଅପେକ୍ଷା କରିବ:",title:"ଆପଣଙ୍କ ଲୋନ ପାଇଁ ଆଗୁଆ ସତର୍କତା",
+      t1:"ଆଗୁଆ ସତର୍କତା",t1s:"କୌଣସି ଦିନର ବିକ୍ରିରୁ କିସ୍ତି ପୂରା ନ କଟିଲେ ଜଣାନ୍ତୁ",
+      t2:"Soundbox ସଙ୍କେତ",t2s:"କେବଳ ଏକ ସାଧାରଣ ସଙ୍କେତ। କେବେ ବି ଟଙ୍କା କିମ୍ବା ଲୋନ କଥା ନୁହେଁ",
+      t3:"ଲୋନ ଅଫର",t3s:"କିଛି ବାକି ନ ଥିଲେ ଋଣଦାତାଙ୍କ ଅଫର ଦେଖାନ୍ତୁ",
+      off:"ଆଲର୍ଟ ବନ୍ଦ ଅଛି। Pakka ଆପଣଙ୍କ ସହ ଯୋଗାଯୋଗ କରିବ ନାହିଁ।",turnOn:"ଆଲର୍ଟ ଚାଲୁ କରନ୍ତୁ",
+      hours:"ଯୋଗାଯୋଗ ସମୟ",hourss:"Pakka କେବେ ଯୋଗାଯୋଗ କରିପାରିବ। କେବେ ବି 08:00–19:00 ବାହାରେ ନୁହେଁ",hoursNow:"Pakka କେବଳ ଏହି ସମୟରେ ବାର୍ତ୍ତା ଦିଏ:",reader:"ଉତ୍ତର ବୁଝେ",
+      permReq:"ଅନୁମତି ଅନୁରୋଧ",permOff:"ଅନୁମତି ଫେରାଯାଇଛି",perm:"ଅନୁମତି",listen:"🔊 ଶୁଣନ୍ତୁ",
+      micNote:"ଭଏସ୍ Chrome କିମ୍ବା Edge ରେ କାମ କରେ। ଆପଣଙ୍କ ବ୍ରାଉଜର୍ କଥାକୁ ଲେଖାରେ ବଦଳାଏ।",
+      micNo:"ଏହି ବ୍ରାଉଜର୍‌ରେ ଭଏସ୍ ଚାଲେ ନାହିଁ। ଦୟାକରି ଉତ୍ତର ଟାଇପ୍ କରନ୍ତୁ।",
+      micDenied:"ମାଇକ୍ରୋଫୋନ୍ ଅନୁମତି ମିଳିଲା ନାହିଁ। ବ୍ରାଉଜର୍‌ରେ ମାଇକ୍ରୋଫୋନ୍ ଚାଲୁ କରନ୍ତୁ, କିମ୍ବା ଟାଇପ୍ କରନ୍ତୁ।",
+      micErr:"ଶୁଣାଗଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ, କିମ୍ବା ଟାଇପ୍ କରନ୍ତୁ।",micCheck:"ଶବ୍ଦ ଦେଖିନିଅନ୍ତୁ, ଦରକାର ହେଲେ ବଦଳାନ୍ତୁ, ତାପରେ ➤ ଦବାନ୍ତୁ।",
+      helpQ:"ସାହାଯ୍ୟ ଦରକାର? ଆପଣ ତଥାପି ଆମକୁ ଲେଖିପାରିବେ। ଏଥିରେ ଆଲର୍ଟ ଚାଲୁ ହେବ ନାହିଁ।",
+      helpNoted:"ଜଣାଗଲା। ଆଲର୍ଟ ବନ୍ଦ ଅଛି, ତେଣୁ Pakka ପେମେଣ୍ଟ ବିଷୟରେ ଆଉ ଯୋଗାଯୋଗ କରିବ ନାହିଁ। ସାହାଯ୍ୟ ଚାହିଁଲେ ଉପରେ ଆଲର୍ଟ ଚାଲୁ କରନ୍ତୁ।",
+      opt:{pay_today:"ଏବେ ଦେବି",pay_later:"କାଲି ଦେବି",skip_today:"ଆଜି ଦେଇପାରିବି ନାହିଁ",lower_deduction:"କମ୍ କଟା",reschedule:"ନୂଆ ତାରିଖ",callback:"ଫୋନ୍ କରନ୍ତୁ",already_paid:"ମୁଁ ଦେଇସାରିଛି"},
+      skipQ:"ଆଜି ଦେଇପାରିବେ ନାହିଁ?",why:"କାରଣ କହିବାକୁ ଚାହାନ୍ତି କି? (ଜରୁରୀ ନୁହେଁ)",
+      reasons:{low_sales:"ବିକ୍ରି କମ୍ ଥିଲା",shop_closed:"ଦୋକାନ ବନ୍ଦ ଥିଲା",family_function:"ପରିବାରରେ କାର୍ଯ୍ୟକ୍ରମ",bank_problem:"ବ୍ୟାଙ୍କ/UPI ସମସ୍ୟା",other:"ଅନ୍ୟ କିଛି",none:"କହିବାକୁ ଚାହେଁ ନାହିଁ"},
+      pick:"କଲ୍ ସମୟ ବାଛନ୍ତୁ (ଆପଣଙ୍କ ଯୋଗାଯୋଗ ସମୟ ମଧ୍ୟରେ):",booked:"କଲ୍ ବୁକ୍ ହେଲା",
+      upi:"UPI ରେ ଦିଅନ୍ତୁ ↗",linkWord:"ପେମେଣ୍ଟ ଲିଙ୍କ",speakNow:"କୁହନ୍ତୁ… ବନ୍ଦ କରିବାକୁ 🎤 ପୁଣି ଦବାନ୍ତୁ",app:"ବିଜନେସ୍ ଆପ୍ (ଡେମୋ) · ଲୋନ: ",
+      notice:(L,O)=>[`<b>କିଏ:</b> Paytm, ${L} ତରଫରୁ ଲୋନ ସେବା ପ୍ରଦାନକାରୀ (LSP)। ଲୋନ ଦେଇଛନ୍ତି ${L}।`,
+        `<b>ଉଦ୍ଦେଶ୍ୟ:</b> କୌଣସି ଦିନର ବିକ୍ରିରୁ ଦୈନିକ କିସ୍ତି ପୂରା ନ କଟିଲେ ଆଗରୁ ଜଣାଇବା, ଏବଂ ଉତ୍ତର ଦେବାରେ ସାହାଯ୍ୟ କରିବା।`,
+        `<b>କେଉଁ ଡାଟା:</b> କେବଳ ଆପଣଙ୍କ ଦୈନିକ ସେଟଲମେଣ୍ଟର ମୋଟ ଏବଂ ${L}ଙ୍କ ପରିଶୋଧ ହିସାବ। ଆପଣଙ୍କ ଗ୍ରାହକଙ୍କ ତଥ୍ୟ ନୁହେଁ।`,
+        `<b>କିଏ କ'ଣ ପାଇବେ:</b> ଆପଣ ଯେଉଁ ଅନୁରୋଧ ପଠାଇବେ (କମ୍ କଟା, ନୂଆ ତାରିଖ, କଲ୍) କେବଳ ତାହା ${L} ପାଇବେ। ମାର୍କେଟିଂ ପାଇଁ କିଛି ସେୟାର ହେବ ନାହିଁ।`,
+        `<b>କେତେ ଦିନ:</b> ଲୋନ ଚାଲିଥିବା ଯାଏଁ, ଏବଂ ଆଇନ ଯେତେ ଦିନ କହେ।`,
+        `<b>ଫେରାଇବା:</b> ଯେକୌଣସି ସମୟରେ, ଗୋଟିଏ ଟ୍ୟାପ୍‌ରେ "ସମ୍ମତି ଫେରାନ୍ତୁ"। ଏଥିରେ ଆପଣଙ୍କ ଲୋନ ଉପରେ ପ୍ରଭାବ ପଡ଼ିବ ନାହିଁ।`,
+        `<b>ଅଭିଯୋଗ ଅଧିକାରୀ:</b> ${O}`]},
+  te:{allow:"అనుమతించండి",notnow:"ఇప్పుడు కాదు",withdraw:"సమ్మతి ఉపసంహరించండి",offers:"లోన్ ఆఫర్లు చూడండి",offersNo:"ఆఫర్లు ఇప్పుడు లేవు",
+      placeholder:"తెలుగు, హిందీ లేదా English లో జవాబివ్వండి",quiet:"Pakka నుండి సందేశాలు లేవు. మీ వాయిదాలు సరిగ్గా సాగుతున్నాయి.",
+      deferred:"Pakka దగ్గర సందేశం ఉంది, కానీ ఎదురుచూస్తుంది:",title:"మీ లోన్ కోసం ముందస్తు హెచ్చరికలు",
+      t1:"ముందస్తు హెచ్చరికలు",t1s:"ఏ రోజైనా అమ్మకాల నుండి వాయిదా పూర్తిగా కట్ కాకపోతే చెప్పండి",
+      t2:"Soundbox సంకేతం",t2s:"ఒక సాధారణ సంకేతం మాత్రమే. ఎప్పుడూ మొత్తాలు లేదా లోన్ వివరాలు కాదు",
+      t3:"లోన్ ఆఫర్లు",t3s:"ఏ బాకీ లేనప్పుడు రుణదాతల ఆఫర్లు చూపించండి",
+      off:"అలర్ట్‌లు ఆఫ్‌లో ఉన్నాయి. Pakka మిమ్మల్ని సంప్రదించదు.",turnOn:"అలర్ట్‌లు ఆన్ చేయండి",
+      hours:"సంప్రదించే సమయం",hourss:"Pakka ఎప్పుడు సంప్రదించవచ్చు. ఎప్పుడూ 08:00–19:00 బయట కాదు",hoursNow:"Pakka ఈ సమయంలో మాత్రమే సందేశం పంపుతుంది:",reader:"జవాబులు అర్థం చేసుకునేది",
+      permReq:"అనుమతి అభ్యర్థన",permOff:"అనుమతి ఉపసంహరించబడింది",perm:"అనుమతి",listen:"🔊 వినండి",
+      micNote:"వాయిస్ Chrome లేదా Edge లో పనిచేస్తుంది. మీ బ్రౌజర్ మాటను రాతగా మారుస్తుంది.",
+      micNo:"ఈ బ్రౌజర్‌లో వాయిస్ పనిచేయదు. దయచేసి జవాబు టైప్ చేయండి.",
+      micDenied:"మైక్రోఫోన్ అనుమతి రాలేదు. బ్రౌజర్‌లో మైక్రోఫోన్ ఆన్ చేయండి, లేదా టైప్ చేయండి.",
+      micErr:"వినిపించలేదు. మళ్ళీ ప్రయత్నించండి, లేదా టైప్ చేయండి.",micCheck:"పదాలు చూసుకోండి, అవసరమైతే మార్చండి, తర్వాత ➤ నొక్కండి.",
+      helpQ:"సహాయం కావాలా? మీరు అయినా మాకు రాయవచ్చు. దీనితో అలర్ట్‌లు ఆన్ అవ్వవు.",
+      helpNoted:"గమనించాం. అలర్ట్‌లు ఆఫ్‌లో ఉన్నాయి, కాబట్టి Pakka చెల్లింపుల గురించి మళ్ళీ సంప్రదించదు. సహాయం కావాలంటే పైన అలర్ట్‌లు ఆన్ చేయండి.",
+      opt:{pay_today:"ఇప్పుడు కడతాను",pay_later:"రేపు కడతాను",skip_today:"ఈరోజు కట్టలేను",lower_deduction:"తక్కువ కోత",reschedule:"కొత్త తేదీ",callback:"ఫోన్ చేయండి",already_paid:"నేను కట్టేశాను"},
+      skipQ:"ఈరోజు కట్టలేరా?",why:"కారణం చెప్పాలనుకుంటున్నారా? (తప్పనిసరి కాదు)",
+      reasons:{low_sales:"అమ్మకాలు తక్కువ",shop_closed:"షాపు మూసి ఉంది",family_function:"ఇంట్లో కార్యక్రమం",bank_problem:"బ్యాంక్/UPI సమస్య",other:"ఇంకేదైనా",none:"చెప్పను"},
+      pick:"కాల్ సమయం ఎంచుకోండి (మీ సంప్రదింపు సమయంలో):",booked:"కాల్ బుక్ అయింది",
+      upi:"UPI తో కట్టండి ↗",linkWord:"చెల్లింపు లింక్",speakNow:"మాట్లాడండి… ఆపడానికి 🎤 మళ్ళీ నొక్కండి",app:"బిజినెస్ యాప్ (డెమో) · లోన్: ",
+      notice:(L,O)=>[`<b>ఎవరు:</b> Paytm, ${L} తరఫున లోన్ సేవా ప్రదాత (LSP). లోన్ ఇచ్చింది ${L}.`,
+        `<b>ఉద్దేశ్యం:</b> ఏ రోజైనా అమ్మకాల నుండి రోజువారీ వాయిదా పూర్తిగా కట్ కాకపోతే ముందుగా చెప్పడం, జవాబు ఇవ్వడంలో సహాయం చేయడం.`,
+        `<b>ఏ డేటా:</b> మీ రోజువారీ సెటిల్‌మెంట్ మొత్తాలు, ${L} చెల్లింపు లెక్కలు మాత్రమే. మీ కస్టమర్ల వివరాలు కాదు.`,
+        `<b>ఎవరికి ఏమి:</b> మీరు పంపే అభ్యర్థనలు (తక్కువ కోత, కొత్త తేదీ, కాల్) మాత్రమే ${L}కి వెళ్తాయి. మార్కెటింగ్ కోసం ఏదీ పంచుకోబడదు.`,
+        `<b>ఎంత కాలం:</b> లోన్ ఉన్నంత కాలం, చట్టం చెప్పినంత కాలం.`,
+        `<b>ఉపసంహరణ:</b> ఎప్పుడైనా, ఒక ట్యాప్‌తో "సమ్మతి ఉపసంహరించండి". దీని వల్ల మీ లోన్‌పై ప్రభావం ఉండదు.`,
+        `<b>ఫిర్యాదుల అధికారి:</b> ${O}`]},
+});
+Object.assign(T.en,{upi:"Pay via UPI ↗",linkWord:"the pay link",speakNow:"Speak now… tap 🎤 again to stop",app:"Business app (demo) · loan from "});
+Object.assign(T.hi,{upi:"UPI से भरें ↗",linkWord:"भुगतान लिंक",speakNow:"बोलिए… रोकने के लिए 🎤 फिर दबाएँ",app:"बिज़नेस ऐप (डेमो) · लोन: "});  // HI: needs native review
+const LOCALE={en:"en-IN",hi:"hi-IN",bn:"bn-IN",od:"or-IN",te:"te-IN"};   // browser speech/date codes (Odia is "or" there)
+const msgOf=(r,k="message")=>(r&&r[k==="message"?"messages":"recall"]?.[lang])||(r?(lang==="hi"?r[k+"_hi"]:r[k+"_en"]):"");
 
 function notice(p){
   const L=p.lender,O=p.grievance_officer;
+  if(T[lang].notice)return T[lang].notice(L,O);
   return lang==="hi"?[
     `<b>कौन:</b> Paytm, ${L} की ओर से लोन सेवा प्रदाता (LSP) के रूप में। लोन ${L} ने दिया है।`,
     `<b>मकसद:</b> जब किसी दिन की बिक्री से रोज़ की किस्त पूरी न कटे, तो आपको जल्दी बताना और जवाब देने में मदद करना।`,
@@ -373,12 +464,14 @@ const post=(path,body)=>api(path,{method:"POST",headers:{"Content-Type":"applica
 const rs=p=>"₹"+(p/100).toLocaleString("en-IN",{maximumFractionDigits:2});
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let tt;function toast(t,ms=4200){const el=$("#toast");el.innerHTML=t;el.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("on"),ms)}
-function dateOf(day){const d=new Date(2026,9,day);return d.toLocaleDateString(lang==="hi"?"hi-IN":"en-IN",{day:"numeric",month:"short"})}
+function dateOf(day){const d=new Date(2026,9,day);return d.toLocaleDateString(LOCALE[lang],{day:"numeric",month:"short"})}
 function setDay(d){$("#day").value=d;$("#dayLbl").textContent=`Day ${d} · ${dateOf(d)}`}
 
 async function init(){
   META=await api("/merchant/personas");
   META.personas.forEach(p=>P[p.merchant_id]=p);
+  const why={bn:"কারণ: ",od:"କାରଣ: ",te:"కారణం: "};  // BN/OD/TE: needs native review
+  Object.entries(META.say||{}).forEach(([l,say])=>{if(T[l]){T[l].say=say;T[l].other=say.skip_today+(l==="te"?". ":"। ")+why[l]}});
   $("#persona").innerHTML=META.personas.map(p=>`<option value="${p.merchant_id}">${esc(p.display_name)} · ${esc(p.title)}</option>`).join("");
   $("#day").max=META.days;
   await select(META.personas[1].merchant_id);
@@ -387,10 +480,11 @@ async function init(){
 async function select(id){cvOut="";booked=null;paid=null;
   mid=id;$("#persona").value=id;last=null;offerBlocked=null;
   const p=P[id];
+  if(["bn","od","te"].includes(p.language))setLang(p.language);
   const meta=await api("/merchant/personas");meta.personas.forEach(q=>P[q.merchant_id].day=q.day);
   setDay(P[id].day);
   $("#story").innerHTML=`<b>${esc(p.title)}</b><span>${esc(p.story)}</span><span class="tag">${esc(p.lender)}</span><span class="tag">${p.shortfall_mode==="carry_forward_fifo"?"Short days: the rest is taken from later sales":"Short days: part-payments are held until a full payment"}</span><span class="tag">Daily loan payment ${rs(p.edi_paise)}</span><span class="tag">Messages only ${hh(p.contact_window[0])}–${hh(p.contact_window[1])}</span>`;
-  $("#phName").textContent=p.display_name;$("#phLender").textContent=lang==="hi"?`बिज़नेस ऐप (डेमो) · लोन: ${p.lender}`:`Business app (demo) · loan from ${p.lender}`;  // HI: needs native review
+  $("#phName").textContent=p.display_name;$("#phLender").textContent=T[lang].app+p.lender;
   $("#sbId").textContent=p.soundbox_id||"NO SOUNDBOX";
   $("#cue").textContent=p.soundbox_id?"Waiting…":"This merchant has no Soundbox. Alerts go to the app.";
   await refresh();
@@ -407,7 +501,7 @@ async function refresh(){
 let cvOut="",declined={};   // "Not now" is remembered per shop, so the request isn't shown again on every refresh
 function helpBox(t){return`<div class="cvhelp"><small>${t.helpQ}</small><div class="reply"><input type="text" id="cvText" placeholder="${t.placeholder}"><button id="cvSend">➤</button></div><div class="cvout" id="cvOut">${cvOut}</div></div>`}
 function bindHelp(){const b=$("#cvSend");if(!b)return;const go=async()=>{const text=$("#cvText").value.trim();if(!text)return;
-  const r=await post(`/merchant/${mid}/reply`,{text});const m=lang==="hi"?r.message_hi:r.message_en;
+  const r=await post(`/merchant/${mid}/reply`,{text});const m=msgOf(r);
   cvOut=esc(r.action==="human_handoff"&&m?m:T[lang].helpNoted);await refresh()};
   b.onclick=go;$("#cvText").onkeydown=e=>{if(e.key==="Enter")go()}}
 function renderPhone(c){
@@ -434,7 +528,7 @@ function renderPhone(c){
   const reader=tech?(cl.mode==="llm"?`${cl.provider} ${cl.model} + keyword fail-safe`:"offline keywords (fail-safe)")
     :lang==="hi"?(cl.mode==="llm"?`${cl.provider} AI, सुरक्षा शब्द-सूची से दोबारा जाँचा गया`:"एक अंदरूनी शब्द-सूची (बिना इंटरनेट के)")  // HI: needs native review
     :(cl.mode==="llm"?`${cl.provider[0].toUpperCase()+cl.provider.slice(1)} AI, double-checked by a safety word list`:"a built-in word list (works offline)");
-  $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="hi"?"–":" to "}${hh(w[1])} · ${t.perm}: ${c.consent?.notice_version||META.notice_version} · ${t.reader}: ${reader}`;
+  $("#hours").textContent=`${t.hoursNow} ${hh(w[0])}${lang==="en"?" to ":"–"}${hh(w[1])} · ${t.perm}: ${c.consent?.notice_version||META.notice_version} · ${t.reader}: ${reader}`;
   $("#micNote").textContent=t.micNote;$("#skipBtn").textContent=t.skipQ;
   renderCard();
   const ob=$("#offers");ob.disabled=!!offerBlocked;ob.textContent=offerBlocked?`${t.offersNo}${tech?" ("+offerBlocked+")":""}`:t.offers;
@@ -443,7 +537,7 @@ function renderPhone(c){
 function renderCard(){
   const t=T[lang],el=$("#card");
   if(!last){el.className="card quiet";el.innerHTML=t.quiet;return}
-  const r=last,msg=lang==="hi"?r.message_hi:r.message_en;
+  const r=last,msg=msgOf(r);
   if(r.scheduled_for){el.className="card quiet";el.innerHTML=`${t.deferred} <b>${new Date(r.scheduled_for).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",hour12:false})}</b><div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(guardText(b))}</span>`).join("")}</div>`;return}
   if(!msg){el.className="card quiet";el.innerHTML=t.quiet+(r.guard_blocks.length?`<div class="chips">${r.guard_blocks.map(b=>`<span class="chip warn">${esc(guardText(b))}</span>`).join("")}</div>`:"");return}
   el.className="card pakka"+(r.action==="human_handoff"?" handoff":"");
@@ -451,10 +545,10 @@ function renderCard(){
     ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",b]),[r.policy_ok?"ok":"bad",r.policy_ok?"policy ok":"policy corrected"],r.lender_request_id?["ok",r.lender_request_id]:null,["",`${r.latency_ms} ms`]]
     :[...(r.rule_ids||[]).map(x=>["",PLAIN[x]||x]),r.intent?["",`Understood: ${PLAIN[r.intent]||r.intent}`]:null,["",`Pakka: ${PLAIN[r.action]||r.action}`],
     ...r.guard_blocks.map(b=>[b.startsWith("G6")?"bad":"warn",guardText(b)]),r.lender_request_id?["ok","Sent to the lender"]:null]).filter(Boolean);
-  el.innerHTML=`<div class="eb"><span>Pakka ✦ <button class="listen" id="listenCard">${t.listen}</button></span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
+  el.innerHTML=`<div class="eb"><span>Pakka ✦ <button class="listen" id="listenCard">${t.listen}</button></span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${t.upi}</a>`)}</div>
     ${r.options.length?`<div class="opts">${r.options.map(o=>`<button data-opt="${o}">${t.opt[o]}</button>`).join("")}</div>`:""}
     <div class="chips">${chips.map(([k,c])=>`<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>`;
-  const rc=lang==="hi"?r.recall_hi:r.recall_en;
+  const rc=msgOf(r,"recall");
   if(rc){const d=document.createElement("div");d.className="recall";d.innerHTML=`🧠 ${esc(rc)}${tech?` <span class="muted">(${esc(r.recall_template_id)}, memory: ${esc(PARTNERS?.memory?.backend||"local")})</span>`:""}`;el.querySelector(".msg").after(d)}
   el.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>b.dataset.opt==="skip_today"?showReasons(el):reply(T[lang].say[b.dataset.opt]));
   if(r.action==="human_callback_booking"&&r.callback_slots?.length&&!booked){
@@ -462,9 +556,9 @@ function renderCard(){
     d.innerHTML=`<small>${t.pick}</small>`+r.callback_slots.map(x=>`<button data-slot="${x}">${fmtSlot(x)}</button>`).join("");
     el.appendChild(d);d.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>book(b.dataset.slot))}
   el.querySelectorAll("a.paylink").forEach(a=>a.onclick=e=>{e.preventDefault();showPay(el,a.getAttribute("href"))});
-  if(paid){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag" style="background:#E7F7EE;color:#1D7A4C">✓ ${tech?paid.template_id:"Payment recorded by the lender"}</span><div>${esc(lang==="hi"?paid.message_hi:paid.message_en)}</div>`;el.appendChild(d)}
-  if(booked){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag">✓ ${t.booked}</span><div>${esc(lang==="hi"?booked.message_hi:booked.message_en)}</div>`;el.appendChild(d)}
-  $("#listenCard").onclick=()=>speakCard(msg.replace(/upi:\/\/\S+/g,lang==="hi"?"भुगतान लिंक":"the pay link"));
+  if(paid){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag" style="background:#E7F7EE;color:#1D7A4C">✓ ${tech?paid.template_id:"Payment recorded by the lender"}</span><div>${esc(msgOf(paid))}</div>`;el.appendChild(d)}
+  if(booked){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag">✓ ${t.booked}</span><div>${esc(msgOf(booked))}</div>`;el.appendChild(d)}
+  $("#listenCard").onclick=()=>speakCard(msg.replace(/upi:\/\/\S+/g,t.linkWord));
 }
 
 // "Can't pay today": optional reason chips. A reason is never required.
@@ -475,7 +569,7 @@ function showPay(host,href){
   const d=document.createElement("div");d.className="paybox";
   d.innerHTML=`Demo: simulate a UPI payment of <b>${rs(am)}</b> to ${esc(P[mid].lender)}? It goes straight to the lender's account, and their payment record updates.<br><button class="go" id="payGo">Pay ${rs(am)} (simulated)</button><button id="payNo">Cancel</button>`;
   host.appendChild(d);$("#payNo").onclick=()=>d.remove();
-  $("#payGo").onclick=async()=>{try{paid=await post(`/merchant/${mid}/pay`,{amount_paise:am});toast(lang==="hi"?paid.message_hi:paid.message_en)}
+  $("#payGo").onclick=async()=>{try{paid=await post(`/merchant/${mid}/pay`,{amount_paise:am});toast(msgOf(paid))}
     catch(e){toast("Nothing is due right now.")}await refresh()};
 }
 function showReasons(host){
@@ -488,10 +582,10 @@ function showReasons(host){
     reply(t.say.skip_today,k==="none"?null:k)});
 }
 let pendingReason=null;
-function fmtSlot(x){const d=new Date(x);return d.toLocaleString(lang==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
+function fmtSlot(x){const d=new Date(x);return d.toLocaleString(LOCALE[lang],{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
 async function book(slot){
   booked=await post(`/merchant/${mid}/callbacks`,{slot});
-  toast(lang==="hi"?booked.message_hi:booked.message_en);await refresh();
+  toast(msgOf(booked));await refresh();
 }
 // Partners: what is live and what is simulated. None of them chooses an action.
 let PARTNERS=null;
@@ -558,7 +652,7 @@ async function offers(){
 
 // Read the app card aloud on the owner's phone: Sarvam voice if set up, otherwise the browser's voice.
 function speakCard(text){
-  const fallback=()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=lang==="hi"?"hi-IN":"en-IN";speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
+  const fallback=()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=LOCALE[lang];speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
   fetch("/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,lang})})
    .then(async r=>{if(!r.ok)throw 0;new Audio(URL.createObjectURL(await r.blob())).play()}).catch(fallback);
 }
@@ -568,7 +662,7 @@ function playCue(text){
   const stop=()=>sb.classList.remove("play");
   fetch(`/merchant/${mid}/soundbox/speak`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,lang:lng})})
    .then(async r=>{if(!r.ok)throw 0;const a=new Audio(URL.createObjectURL(await r.blob()));a.onended=stop;a.play()})
-   .catch(()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=lng==="hi"?"hi-IN":"en-IN";u.onend=stop;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}setTimeout(stop,4500)});
+   .catch(()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=LOCALE[lng]||"en-IN";u.onend=stop;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}setTimeout(stop,4500)});
 }
 
 // What happened on a day, for the lender's payment record: the owner's replies (labels only, never the
@@ -620,7 +714,9 @@ $("#offers").onclick=offers;$("#skipBtn").onclick=()=>showReasons($("#card"));$(
 $("#replay").onclick=()=>playCue(lastCue);
 $("#tech").onchange=async e=>{tech=e.target.checked;await refresh()};
 $("#reset").onclick=async()=>{await post("/merchant/reset");last=null;cvOut="";declined={};offerBlocked=null;lastCue=null;toast("Demo reset.");await select(mid)};
-document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{lang=b.dataset.lang;{const p=P[mid];if(p)$("#phLender").textContent=lang==="hi"?`बिज़नेस ऐप (डेमो) · लोन: ${p.lender}`:`Business app (demo) · loan from ${p.lender}`}document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x===b));await refresh()});
+function setLang(l){lang=l;const p=P[mid];if(p)$("#phLender").textContent=T[lang].app+p.lender;
+  document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x.dataset.lang===l))}
+document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{setLang(b.dataset.lang);await refresh()});
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 // Voice: the transcript goes into the reply box for the owner to check, edit and send. Never auto-sent.
 let recorder=null;
@@ -637,11 +733,11 @@ async function sarvamVoice(t){
       const box=$("#replyText");box.value=r.transcript;box.focus();toast(`${t.micCheck} (Voice by Sarvam)`)}
     catch(e){toast("Sarvam couldn't hear that, so your browser will listen instead.");browserVoice(t)}};
   recorder.start();setTimeout(()=>recorder&&recorder.state==="recording"&&recorder.stop(),8000);
-  toast(lang==="hi"?"बोलिए… रोकने के लिए 🎤 फिर दबाएँ":"Speak now… tap 🎤 again to stop");return true;
+  toast(T[lang].speakNow);return true;
 }
 function browserVoice(t){
   if(!SR){toast(t.micNo);return}
-  const rec=new SR();rec.lang=lang==="hi"?"hi-IN":"en-IN";rec.interimResults=false;
+  const rec=new SR();rec.lang=LOCALE[lang];rec.interimResults=false;
   $("#mic").classList.add("on");rec.onend=()=>$("#mic").classList.remove("on");
   rec.onerror=e=>{$("#mic").classList.remove("on");toast(e.error==="not-allowed"||e.error==="service-not-allowed"?t.micDenied:t.micErr)};
   rec.onresult=e=>{const box=$("#replyText");box.value=e.results[0][0].transcript;box.focus();toast(`${t.micCheck} (Voice by your browser)`)};

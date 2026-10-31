@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from pakka import sarvam
-from pakka.merchant import actions, intents, memory, policy
+from pakka.merchant import actions, intents, lang_pack, memory, policy
 from pakka.merchant.agent import Desk
 from pakka.merchant.guard import effective_window, in_window
 from pakka.merchant.models import ConsentIn
@@ -76,7 +76,8 @@ def list_personas():
             "preferred_window": (desk.store.consent(mid).contact_window if desk.store.consent(mid) else None),
         })
     return {"personas": out, "days": DAYS, "notice_version": policy.notice_version(),
-            "soundbox_cues": SOUNDBOX_CUE, "thresholds": THRESHOLDS, "classifier": classifier()}
+            "soundbox_cues": SOUNDBOX_CUE, "thresholds": THRESHOLDS, "classifier": classifier(),
+            "say": lang_pack.SAY, "languages": lang_pack.LANG_NAMES}
 
 
 def classifier() -> dict:

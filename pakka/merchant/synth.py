@@ -87,6 +87,24 @@ def personas(demo: bool = False) -> dict[str, Persona]:
     fruit = _base(random.Random(57), 140_000, 220_000)              # own seed: the five above stay unchanged
     fruit[4], fruit[5], fruit[6] = 30_000, 20_000, 25_000           # slow days 5, 6 and 7
 
+    extra = []
+    if demo:                                                        # demo only: one shop per new language
+        lrng = random.Random(83)                                    # own seed: nothing above changes
+        sweets = _base(lrng, 130_000, 210_000)
+        sweets[3], sweets[4] = 35_000, 0                            # short day 4, shut day 5 (puja holiday)
+        tiffin = _base(lrng, 100_000, 170_000)
+        tiffin[4] = 30_000                                          # short day 5 under prepayment mode
+        saree = _base(lrng, 120_000, 260_000)
+        saree[2], saree[3], saree[4] = 40_000, 25_000, 30_000       # slow days 3, 4 and 5
+        extra = [
+            _make("sweets_kolkata", "Das Mishti Bhandar", "bn", "demo_nbfc_a", sweets,
+                  "Sweet shop, Bengali", "Bengali-speaking owner. Day 4 falls short; on day 5 the shop is shut."),
+            _make("tiffin_cuttack", "Mohanty Tiffin Centre", "od", "demo_bank_b", tiffin,
+                  "Tiffin centre, Odia", "Odia-speaking owner. Day 5 is short; this lender holds part-payments."),
+            _make("saree_vijayawada", "Lakshmi Saree Centre", "te", "demo_nbfc_a", saree,
+                  "Saree shop, Telugu", "Telugu-speaking owner. Sales dip on days 3, 4 and 5."),
+        ]
+
     out = [
         _make("kirana_steady", "Sharma Kirana Store", "en", "demo_nbfc_a", kirana,
               "Steady kirana", "Sales always cover the daily payment, so Pakka should never message them."),
@@ -104,7 +122,7 @@ def personas(demo: bool = False) -> dict[str, Persona]:
               "Fruit cart, can't pay today",
               "Sales dip on days 5, 6 and 7. Each day the owner says they can't pay today. Pakka explains the "
               "lender's carry-forward twice, then offers a call with a person."),
-    ]
+    ] + extra
     return {p.merchant.merchant_id: p for p in out}
 
 

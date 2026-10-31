@@ -6,7 +6,7 @@ import urllib.request
 from .pii import mask
 
 API = "https://api.sarvam.ai"
-LANG_CODES = {"en": "en-IN", "hi": "hi-IN"}
+LANG_CODES = {"en": "en-IN", "hi": "hi-IN", "bn": "bn-IN", "od": "od-IN", "te": "te-IN"}   # all in Bulbul and Saaras
 
 
 def enabled() -> bool:

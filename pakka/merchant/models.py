@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-Lang = Literal["en", "hi"]
+Lang = Literal["en", "hi", "bn", "od", "te"]     # bn/od/te text: see lang_pack.py (needs native review)
 
 Intent = Literal["will_pay_today", "will_pay_later", "request_lower_deduction",
                  "request_reschedule", "request_callback", "request_skip_today", "dispute", "hardship",
@@ -127,6 +127,7 @@ class MerchantRescue(BaseModel):
     template_id: Optional[str] = None
     message_en: str = ""
     message_hi: str = ""
+    messages: dict[str, str] = {}              # the same message in every supported language (en, hi, bn, od, te)
     options: list[str] = []
     soundbox_cue_text: Optional[str] = None
     lender_request_id: Optional[str] = None
@@ -136,5 +137,6 @@ class MerchantRescue(BaseModel):
     recall_template_id: Optional[str] = None   # optional line from memory; context only, never the action
     recall_en: str = ""
     recall_hi: str = ""
+    recall: dict[str, str] = {}
     dispatch_status: Optional[str] = None      # sent_n8n | simulated | failed_fallback (None: not dispatched)
     latency_ms: float = 0.0
