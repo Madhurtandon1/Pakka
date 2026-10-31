@@ -123,7 +123,9 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .cbtns .allow{background:var(--navy);color:#fff}
 .cbtns .no{background:#fff;color:var(--navy)}
 /* soundbox */
-.sbwrap{display:flex;flex-direction:column;align-items:center;gap:14px;position:sticky;top:90px}
+.sbwrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+/* The Soundbox follows the scroll only in the wide 3-column layout, where nothing sits under it. */
+@media(min-width:1181px){.sbwrap{position:sticky;top:90px}}
 .soundbox{width:200px;height:250px;border-radius:34px;background:linear-gradient(160deg,#1E3A66,#0A1B36);border:1px solid #2B4A7A;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
 .grill{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,#0C1E3B 2px,transparent 2.5px) 0 0/12px 12px,#152E55;border:3px solid #2B4A7A;transition:transform .15s}
 .soundbox.play .grill{animation:thump .45s ease-in-out infinite}
@@ -149,6 +151,8 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .tile.good{background:var(--greenBg)}.tile.good b{color:var(--green)}
 .tile.bad{background:var(--redBg)}.tile.bad b{color:var(--red)}
 .tbl{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+/* Narrower: the lender view sits below, so no floating Soundbox and no small scroll boxes that catch the wheel. */
+@media(max-width:1180px){.tbl{max-height:none;overflow-x:auto;overflow-y:hidden}.top{position:static}}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th{position:sticky;top:0;background:var(--paper);text-align:left;font-weight:600;color:var(--muted);padding:7px 9px;white-space:nowrap}
 td{padding:6px 9px;border-top:1px solid var(--line);vertical-align:top}
@@ -560,7 +564,7 @@ async function loadLedger(){
   const tb=$("#ledgerTbl");tb.scrollTop=tb.scrollHeight;
 }
 async function loadAudit(){
-  const rows=await api(`/merchant/audit?merchant_id=${mid}&limit=40`);
+  const rows=await api(`/merchant/audit?merchant_id=${mid}&limit=15`);
   $("#auditTbl").innerHTML=rows.length?(tech?`<table><tr><th>When</th><th>Rules / intent</th><th>Action</th><th>Guard</th></tr>`:`<table><tr><th>When</th><th>Why</th><th>What Pakka did</th><th>Safety check</th></tr>`)+rows.map(r=>`<tr><td>${esc(r.ts.slice(5,16).replace("T"," "))}</td><td>${esc(tech?(r.rule_ids.join(" ")||"")+(r.intent?` ${r.intent} (${r.intent_source})`:""):[...r.rule_ids.map(x=>PLAIN[x]||x),r.intent?`Reply: ${PLAIN[r.intent]||r.intent}`:""].filter(Boolean).join(" · "))}</td><td>${esc(plain(r.action))}<br><span class="muted">${esc(tech?r.channel:CH[r.channel]||r.channel)}${tech&&r.consent_version?" · "+esc(r.consent_version):""}</span></td><td>${r.guard_blocks.map(b=>`<span class="chip ${b.startsWith("G6")?"bad":"warn"}">${esc(guardText(b))}</span>`).join(" ")||`<span class="chip ok">${tech?"passed":"OK"}</span>`}</td></tr>`).join("")+`</table>`:`<p class="muted" style="padding:10px">Nothing yet. Every message Pakka sends, and every safety check, appears here.</p>`;
   const h=$("#hist");
   h.innerHTML=rows.filter(r=>r.message&&r.channel!=="none").slice(1,6).map(r=>`<div><em>${esc(r.ts.slice(5,10))}</em> ${esc(r.message.slice(0,140))}${r.message.length>140?"…":""}</div>`).join("");

@@ -1,6 +1,6 @@
 # Merchant UI test report
 
-Run: 31 Oct 2026 11:47 · target: local app, offline (no LLM, no Sarvam key) · **30 / 30 scenarios passed**
+Run: 31 Oct 2026 12:15 · target: local app, offline (no LLM, no Sarvam key) · **30 / 30 scenarios passed**
 
 | # | Scenario | Result | Notes |
 |---|---|---|---|
