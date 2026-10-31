@@ -4,10 +4,11 @@
 # Render assigns, serves the pages, and proxies the API to FastAPI (see deploy/).
 services:
   - type: web
-    name: pakka
+    name: pakka-languages          # separate service: English, Hindi, Bengali, Odia, Telugu demo
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
+    branch: languages-demo         # deploys only this branch; main and skip-today are untouched
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
