@@ -51,7 +51,8 @@ def test_negation_with_money_is_still_hardship(text):
 
 
 @pytest.mark.parametrize("text,label", [("aaj nahi, kal kar dunga", "unclear"), ("aaj kaat lo", "unclear"),
-                                        ("kal de dunga", "will_pay_later"), ("aaj nahi de paunga", "unclear")])
+                                        ("kal de dunga", "will_pay_later")])
+# ("aaj nahi de paunga" became a skip request on purpose: "can't pay today" is now understood, see below.)
 def test_one_marker_alone_is_not_a_skip(text, label):
     assert keyword_classify(text) == label
 
@@ -257,4 +258,23 @@ def test_new_hindi_strings_are_marked_for_review():
     src = (ROOT / "pakka" / "merchant" / "templates.py").read_text(encoding="utf-8")
     block = src[src.index('"T_SKIP_ACK"'):src.index('"T_REPEAT_OFFER"')]
     hi = [ln for ln in block.splitlines() if "# HI:" in ln]
-    assert len(hi) == 4
+    assert len(hi) == block.count('"T_')          # one marked Hindi string per template in the block
+
+
+@pytest.mark.parametrize("text", ["aaj nahi dunga", "aaj nahi de paunga", "can't pay today", "I won't pay today",
+                                  "आज नहीं दूंगा"])
+def test_cant_pay_today_without_a_deduct_word(text):
+    assert keyword_classify(text) == "request_skip_today"
+
+
+@pytest.mark.parametrize("text,label", [("aaj nahi, kal kar dunga", "unclear"), ("aaj nahi dunga kal pakka", "unclear"),
+                                        ("bimar hoon aaj nahi dunga", "hardship"), ("aaj de dunga", "will_pay_today")])
+def test_promise_or_distress_is_not_a_skip(text, label):
+    assert keyword_classify(text) == label
+
+
+def test_cant_pay_on_a_covered_day_says_nothing_is_pending():
+    d = desk_with()
+    d.run_day_end("fruit_cart", 3)                      # sales covered the payment
+    r = d.run_reply("fruit_cart", "aaj nahi dunga", day=3)
+    assert r.template_id == "T_SKIP_NOTHING_DUE" and "nothing is pending" in r.message_en

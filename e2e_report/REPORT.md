@@ -1,6 +1,6 @@
 # Merchant UI test report
 
-Run: 31 Oct 2026 12:15 · target: local app, offline (no LLM, no Sarvam key) · **30 / 30 scenarios passed**
+Run: 31 Oct 2026 12:40 · target: local app, offline (no LLM, no Sarvam key) · **31 / 31 scenarios passed**
 
 | # | Scenario | Result | Notes |
 |---|---|---|---|
@@ -34,16 +34,17 @@ Run: 31 Oct 2026 12:15 · target: local app, offline (no LLM, no Sarvam key) · 
 | 21 | 21. Verma Fruit Cart: "Can't pay today" ×3 → carry-forward explained twice, then a callback is booked | ✅ pass |  |
 | 22a | 22. Partners offline: status strip, simulated actions, people queue, memory and recall lines | ✅ pass |  |
 | 22b | 22. Sarvam speech-to-text path: recorded audio → transcript in the box, not sent until Send | ✅ pass |  |
+| 23 | 23. Spontaneous replies on any day and pay-link payments show up live in the lender's payment record | ✅ pass |  |
 
 ## Console errors
 
 - None (apart from the expected ones below).
-- Expected offline: 39 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
+- Expected offline: 40 × "503" from the voice endpoints (no Sarvam key, so the page uses the browser's voice).
 
 ## Failed network requests
 
 - None unexpected.
-- Expected offline: 39 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
+- Expected offline: 40 × 503 from `/speak` or `/soundbox/speak` (fallback to the browser's voice).
 
 ## Bugs found and fixed
 
@@ -61,7 +62,7 @@ Run: 31 Oct 2026 12:15 · target: local app, offline (no LLM, no Sarvam key) · 
 - Cadence: the person takes over on the 4th proactive contact (days 15, 17, 19 messaged; day 21 → person). The feature doc and README say "the third attempt goes to a person"; the code hands off after three attempts. The wording should say "after three messages". A worsening overdue stage (SMA-0 → SMA-1) can't be reached in the 30-day demo; it is covered by the unit tests.
 - The audit chip for that handover reads "Third try, so a person takes over" although it is the 4th contact.
 
-## Screenshots (59)
+## Screenshots (61)
 
 Saved in `e2e_report/`:
 
@@ -124,3 +125,5 @@ Saved in `e2e_report/`:
 - 22a_partners_offline_03_memory_deleted_on_withdraw.png
 - 22a_partners_offline_04_recall_city_mobile.png
 - 22b_sarvam_voice_path_01_sarvam_transcript.png
+- 23_live_replies_and_payments_in_the_record_01_spontaneous_reply_recorded.png
+- 23_live_replies_and_payments_in_the_record_02_payment_recorded.png

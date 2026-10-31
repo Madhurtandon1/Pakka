@@ -664,3 +664,32 @@ def test_22b_sarvam_voice_path(ui):
         ui.p.click("#send")
     ui.see("#card", "as your lender's plan allows")
     ui.p.unroute_all(behavior="ignoreErrors")    # don't leave the fake routes open at browser close
+
+
+def test_23_live_replies_and_payments_in_the_record(ui):
+    """23. Spontaneous replies on any day and pay-link payments show up live in the lender's payment record"""
+    ui.open("chai_seasonal", mic="fake")
+    ui.allow()
+    ui.run(3)                                      # an ordinary day: sales covered the payment
+    ui.p.evaluate("window.__transcript='aaj nahi dunga'")
+    ui.p.click("#mic")
+    expect(ui.p.locator("#replyText")).to_have_value("aaj nahi dunga")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#send")
+    ui.see("#card", "nothing is pending")
+    ui.see("#ledgerTbl tr.now", "Owner: can't pay today")
+    ui.shot("spontaneous_reply_recorded")
+    ui.run(10)                                     # the rainy day: ₹400 short
+    ui.tap("pay_today")
+    ui.p.click("#card a.paylink")
+    ui.see("#card .paybox", "simulate a UPI payment of ₹400")
+    with ui.p.expect_response(lambda r: r.url.endswith("/pay")):
+        ui.p.click("#payGo")
+    ui.see("#toast", "has received ₹400")
+    ui.see("#card", "Payment recorded by the lender")
+    ui.see("#ledgerTbl tr.now", "₹400 received via pay link")
+    row = ui.p.inner_text("#ledgerTbl tr.now")
+    assert "Owner: will pay today" in row, row
+    ui.shot("payment_recorded")
+    ui.run(11)
+    ui.see("#card", "up to date")

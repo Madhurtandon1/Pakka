@@ -86,6 +86,7 @@ class LedgerDay(BaseModel):
     oldest_unpaid_date: Optional[date] = None
     dpd: int
     sma_bucket: Literal["standard", "SMA-0", "SMA-1", "SMA-2", "NPA"]
+    paid_direct_paise: int = 0                 # paid by the owner through the pay link that day (demo: simulated UPI)
 
 
 class ConsentIn(BaseModel):

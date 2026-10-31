@@ -183,6 +183,8 @@ def _render(s: State) -> State:
             tid = "T_SHORTFALL" if today.shortfall_today_paise else "T_ARREARS"
     if action == "send_pay_link" and 0 < today.shortfall_today_paise < today.total_overdue_paise:
         tid = "T_PAY_CHOICE"
+    if action == "acknowledge_carry_forward" and not today.shortfall_today_paise and not today.total_overdue_paise:
+        tid = "T_SKIP_NOTHING_DUE"            # a spontaneous "can't pay today" on a day that's already covered
     if action == "no_action" and blocker == "cured" and "G1_consent" not in v.blocks:
         tid = "T_CURED"
     if not tid:
@@ -322,6 +324,11 @@ class Desk:
         return datetime.combine(self.date_of(merchant_id, day), dtime(h, m))
 
     def ledger(self, merchant_id: str, day: int | None = None) -> list[LedgerDay]:
+        paid = self.store.payments(merchant_id)
+        if paid:                                    # live payments: recompute (cheap), never cached
+            p = self.persona(merchant_id)
+            full = simulate(p.loan, p.settlements, p.lender, paid)
+            return full if day is None else full[:max(1, min(day, len(full)))]
         if merchant_id not in self._ledgers:
             p = self.persona(merchant_id)
             self._ledgers[merchant_id] = simulate(p.loan, p.settlements, p.lender)
@@ -374,6 +381,32 @@ class Desk:
                   day: int | None = None, reason: str | None = None) -> MerchantRescue:
         day = day or self.store.sim_day(merchant_id)
         return self._run("reply", merchant_id, day, now or self.at(merchant_id, day, "18:05"), text, reason)
+
+    def pay(self, merchant_id: str, amount_paise: int, now: datetime | None = None) -> dict:
+        """The owner pays through the pay link (simulated UPI in the demo). The lender's ledger records it;
+        Pakka only confirms the lender's figures."""
+        p = self.persona(merchant_id)
+        day = self.store.sim_day(merchant_id)
+        now = now or self.at(merchant_id, day, "18:20")
+        owed = self.ledger(merchant_id, day)[-1].total_overdue_paise
+        if amount_paise <= 0 or owed <= 0:
+            raise ValueError("nothing is due")
+        amount = min(amount_paise, owed)
+        self.store.add_payment(merchant_id, now.date(), amount, "upi_link_simulated", now)
+        after = self.ledger(merchant_id, day)[-1]
+        tid = "T_PAYMENT_ALL_CLEAR" if after.total_overdue_paise == 0 else "T_PAYMENT_RECEIVED"
+        vals = {lang: {"lender": p.lender.lender_name, "amount": rupees(amount),
+                       "overdue": rupees(after.total_overdue_paise)} for lang in ("en", "hi")}
+        en, hi = render_both(tid, vals)
+        self.store.log({"ts": now.isoformat(), "merchant_id": merchant_id, "loan_id": p.loan.loan_id,
+                        "blocker": "payment", "rule_ids": [], "intent": None, "intent_source": "none",
+                        "action": "no_action", "template_id": tid, "channel": "app_card", "guard_blocks": [],
+                        "policy_ok": 1, "escalated": 0, "language": p.merchant.language, "proactive": 0,
+                        "message": hi if p.merchant.language == "hi" else en})
+        if after.total_overdue_paise == 0 and memory.consented(self.store, merchant_id):
+            self.store.memory_add(merchant_id, now.date(), "paid_up", "{}")
+        return {"template_id": tid, "message_en": en, "message_hi": hi, "paid_paise": amount,
+                "total_due_paise": after.total_overdue_paise, "ledger_day": after}
 
     def book_callback(self, merchant_id: str, slot: datetime, now: datetime | None = None) -> dict:
         """Book a callback with a person at the lender, only inside the merchant's contact hours."""

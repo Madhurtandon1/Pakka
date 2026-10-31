@@ -29,6 +29,10 @@ class ReplyIn(BaseModel):
     reason: str | None = None       # optional "can't pay today" reason chip; never required
 
 
+class PayIn(BaseModel):
+    amount_paise: int
+
+
 class CallbackIn(BaseModel):
     slot: datetime                  # one of the times offered with human_callback_booking
 
@@ -244,8 +248,30 @@ def offers(mid: str):
 def ledger(mid: str, day: int | None = Query(default=None, ge=1, le=DAYS)):
     p = _persona(mid)
     day = day or desk.store.sim_day(mid)
+    rows = desk.ledger(mid, day)
+    # What happened that day, from the audit log: the owner's replies (as labels, never the raw text),
+    # Pakka's actions and any payment through the pay link. Spontaneous replies show up here live.
+    events: dict[str, list] = {}
+    for a in reversed(desk.store.audit(500, mid)):
+        d = a["ts"][:10]
+        if a["blocker"] == "payment":
+            events.setdefault(d, []).append({"kind": "payment"})
+        elif a["intent"]:
+            events.setdefault(d, []).append({"kind": "reply", "intent": a["intent"], "action": a["action"]})
+        elif a["channel"] != "none" or a["scheduled_for"]:
+            events.setdefault(d, []).append({"kind": "pakka", "action": a["action"], "deferred": bool(a["scheduled_for"])})
     return {"merchant_id": mid, "lender": p.lender.lender_name, "shortfall_mode": p.lender.shortfall_mode,
-            "day": day, "rows": desk.ledger(mid, day)}
+            "day": day, "rows": rows, "events": events}
+
+
+@router.post("/{mid}/pay")
+def pay(mid: str, body: PayIn):
+    """Demo stand-in for a UPI payment through the pay link: the lender's ledger records it."""
+    _persona(mid)
+    try:
+        return desk.pay(mid, body.amount_paise)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/lender/requests")

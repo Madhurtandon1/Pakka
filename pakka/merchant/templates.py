@@ -78,6 +78,12 @@ TEMPLATES = {
         "hi": "ठीक है। आज की रकम कल की बिक्री से ली जाएगी, जैसा आपके लोन देने वाले का प्लान अनुमति देता है। "
               "{charges_note} हो सके तो अभी कुछ हिस्सा भर दें: {link}",  # HI: needs native review
     },
+    "T_SKIP_NOTHING_DUE": {
+        "en": "Today's payment to {lender} has already been taken from today's sales, so nothing is pending. "
+              "If a day is slow, just tell us that day.",
+        "hi": "{lender} की आज की किस्त आज की बिक्री से कट चुकी है, इसलिए कुछ बाकी नहीं है। "
+              "जिस दिन धंधा धीमा हो, उसी दिन बता दीजिए।",  # HI: needs native review
+    },
     "T_SKIP_ROUTED": {
         "en": "Your request has been sent to {lender}. They will decide and let you know. "
               "Until then, your current schedule stays the same.",
@@ -96,6 +102,15 @@ TEMPLATES = {
     "T_REPEAT_OFFER": {
         "en": "You can view offers from lenders on the offers screen. Compare them before choosing.",
         "hi": "आप ऑफ़र स्क्रीन पर अलग-अलग लोन देने वालों के ऑफ़र देख सकते हैं। चुनने से पहले तुलना करें।",
+    },
+    # A payment the owner made through the pay link, confirmed with the lender's own figures.
+    "T_PAYMENT_RECEIVED": {
+        "en": "{lender} has received {amount} from you. Total due now: {overdue}.",
+        "hi": "{lender} को आपसे {amount} मिल गए। अभी कुल बकाया: {overdue}।",  # HI: needs native review
+    },
+    "T_PAYMENT_ALL_CLEAR": {
+        "en": "{lender} has received {amount} from you. You're all caught up. Thank you.",
+        "hi": "{lender} को आपसे {amount} मिल गए। अब कुछ बकाया नहीं है। धन्यवाद।",  # HI: needs native review
     },
     # Optional recall lines filled from memory (context only; never changes the action).
     "T_RECALL_PENDING_REQUEST": {

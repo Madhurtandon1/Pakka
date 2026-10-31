@@ -138,6 +138,14 @@ _FROM_TOMORROW = [_compile(w) for w in FROM_TOMORROW]
 _TODAY = [_compile(w) for w in TODAY_WORDS]
 _ADJUST = [_prefix(w) for w in ADJUST_WORDS]
 _LATER = [_prefix(w) for w in LATER_MARKERS]
+# Also a skip request: "aaj nahi dunga" / "can't pay today" (today + not + a pay verb), but only with no
+# later-time word; "aaj nahi, kal kar dunga" is a promise to pay, not a skip (it stays unclear -> a person).
+CANT_PAY = PAY_VERBS + ["de paunga", "de paoonga", "de sakta", "de sakunga", "bhar paunga", "kar paunga",
+                        "दे पाऊँगा", "दे पाऊंगा", "भर पाऊँगा", "भर पाऊंगा", "कर पाऊँगा"]
+LATER_TIME = ["kal", "tomorrow", "कल", "parso", "parson", "परसों", "next week", "agle hafte", "subah", "सुबह",
+              "baad mein", "baad me", "बाद में", "later"]
+_CANT_PAY = [_prefix(w) for w in CANT_PAY]
+_LATER_TIME = [_compile(w) for w in LATER_TIME]
 _NEGATIONS = [_neg(w) for w in NEGATIONS]
 _MONEY = [_prefix(w) for w in MONEY_WORDS]
 
@@ -153,7 +161,9 @@ def is_skip_request(text: str) -> bool:
     today = _any(_TODAY, low)
     skip_marker = (_any(_SKIP, low) or _any(_FROM_TOMORROW, low)
                    or (today and (_any(_NEGATIONS, low) or _any(_ADJUST, low))))
-    return skip_marker and _any(_LATER, low)
+    if skip_marker and _any(_LATER, low):
+        return True
+    return today and _any(_NEGATIONS, low) and _any(_CANT_PAY, low) and not _any(_LATER_TIME, low)
 
 
 def keyword_classify(text: str) -> str:

@@ -36,6 +36,9 @@ class _Serialised:
         return getattr(self._conn, name)
 
 SCHEMA = """
+create table if not exists merchant_payments (
+    id integer primary key autoincrement, merchant_id text, day text, amount_paise integer, source text, at text
+);
 create table if not exists merchant_outbox (
     event_id text primary key, merchant_id text, action text, payload text, status text, detail text, at text
 );
@@ -76,7 +79,8 @@ create table if not exists merchant_sim (merchant_id text primary key, day integ
 """
 
 TABLES = ["merchant_consent", "merchant_episodes", "merchant_requests", "merchant_audit", "merchant_sim",
-          "merchant_flags", "merchant_appointments", "merchant_outbox", "merchant_queue", "merchant_memory"]
+          "merchant_flags", "merchant_appointments", "merchant_outbox", "merchant_queue", "merchant_memory",
+          "merchant_payments"]
 
 
 class MerchantStore:
@@ -219,6 +223,16 @@ class MerchantStore:
                     (aid, merchant_id, loan_id, lender_id, slot.isoformat(), reminder_at.isoformat(),
                      "booked", reason, at.isoformat()))
         return self.appointments(merchant_id=merchant_id)[0]
+
+    # Payments the owner made through the pay link (simulated UPI in the demo).
+    def add_payment(self, merchant_id: str, day: date, amount_paise: int, source: str, at: datetime) -> None:
+        self._write("insert into merchant_payments (merchant_id, day, amount_paise, source, at) values (?, ?, ?, ?, ?)",
+                    (merchant_id, day.isoformat(), amount_paise, source, at.isoformat()))
+
+    def payments(self, merchant_id: str) -> dict:
+        rows = self.db.execute("select day, sum(amount_paise) from merchant_payments where merchant_id = ? group by day",
+                               (merchant_id,))
+        return {date.fromisoformat(r[0]): r[1] for r in rows}
 
     # Partner actions (n8n or simulated): one row per event_id, so a retried event is never sent twice.
     def outbox_get(self, event_id: str) -> Optional[dict]:

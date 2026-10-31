@@ -84,6 +84,10 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .partners{max-width:1500px;margin:0 auto;padding:8px 22px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--fog)}
 .partners b{color:#E6ECF5;font-weight:600}.partners .p{border:1px solid var(--edge);border-radius:999px;padding:3px 10px}
 .partners .p.live{border-color:#2E9E6B;color:#BFF0D8}.partners .why{cursor:help;text-decoration:underline dotted}
+.paybox{margin-top:10px;border:1px dashed var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px}
+.paybox button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:999px;padding:5px 10px;font-size:12.5px;margin:6px 6px 0 0;cursor:pointer}
+.paybox button.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+td.ev{min-width:170px}td.ev .chip{display:inline-block;margin:1px 3px 1px 0;font-size:11px}
 .recall{margin-top:8px;font-size:12.5px;background:#F1F5FF;border-radius:10px;padding:7px 10px;color:#2A3B5C}
 .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
 @media(max-width:1000px){.three{grid-template-columns:1fr}}
@@ -380,7 +384,7 @@ async function init(){
   await select(META.personas[1].merchant_id);
 }
 
-async function select(id){cvOut="";booked=null;
+async function select(id){cvOut="";booked=null;paid=null;
   mid=id;$("#persona").value=id;last=null;offerBlocked=null;
   const p=P[id];
   const meta=await api("/merchant/personas");meta.personas.forEach(q=>P[q.merchant_id].day=q.day);
@@ -457,12 +461,23 @@ function renderCard(){
     const d=document.createElement("div");d.className="slots";
     d.innerHTML=`<small>${t.pick}</small>`+r.callback_slots.map(x=>`<button data-slot="${x}">${fmtSlot(x)}</button>`).join("");
     el.appendChild(d);d.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>book(b.dataset.slot))}
+  el.querySelectorAll("a.paylink").forEach(a=>a.onclick=e=>{e.preventDefault();showPay(el,a.getAttribute("href"))});
+  if(paid){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag" style="background:#E7F7EE;color:#1D7A4C">✓ ${tech?paid.template_id:"Payment recorded by the lender"}</span><div>${esc(lang==="hi"?paid.message_hi:paid.message_en)}</div>`;el.appendChild(d)}
   if(booked){const d=document.createElement("div");d.className="slots";d.innerHTML=`<span class="skipflag">✓ ${t.booked}</span><div>${esc(lang==="hi"?booked.message_hi:booked.message_en)}</div>`;el.appendChild(d)}
   $("#listenCard").onclick=()=>speakCard(msg.replace(/upi:\/\/\S+/g,lang==="hi"?"भुगतान लिंक":"the pay link"));
 }
 
 // "Can't pay today": optional reason chips. A reason is never required.
-let booked=null;
+let booked=null,paid=null;
+function showPay(host,href){
+  host.querySelector(".paybox")?.remove();
+  const am=Math.round(parseFloat(new URL(href.replace("upi://","http://x/")).searchParams.get("am")||"0")*100);
+  const d=document.createElement("div");d.className="paybox";
+  d.innerHTML=`Demo: simulate a UPI payment of <b>${rs(am)}</b> to ${esc(P[mid].lender)}? It goes straight to the lender's account, and their payment record updates.<br><button class="go" id="payGo">Pay ${rs(am)} (simulated)</button><button id="payNo">Cancel</button>`;
+  host.appendChild(d);$("#payNo").onclick=()=>d.remove();
+  $("#payGo").onclick=async()=>{try{paid=await post(`/merchant/${mid}/pay`,{amount_paise:am});toast(lang==="hi"?paid.message_hi:paid.message_en)}
+    catch(e){toast("Nothing is due right now.")}await refresh()};
+}
 function showReasons(host){
   const t=T[lang];host=host||$("#card");host.querySelector(".reasons")?.remove();
   const d=document.createElement("div");d.className="reasons";
@@ -516,6 +531,7 @@ async function grant(){
 async function withdraw(){await api(`/merchant/${mid}/consent`,{method:"DELETE"});last=null;toast("Permission taken back. Pakka won't message this shop.");await refresh()}
 
 async function runDay(){
+  paid=null;
   const day=+$("#day").value,now=$("#clock").value||"18:00";
   const out=await post(`/merchant/${mid}/simulate?day=${day}&now=${now}`);
   P[mid].day=day;const r=out.rescue,l=out.ledger_day;
@@ -531,7 +547,7 @@ async function nextDay(){const d=Math.min(+$("#day").value+1,META.days);setDay(d
 
 async function reply(text,reason){
   text=(text??$("#replyText").value).trim();if(!text)return;$("#replyText").value="";
-  if(reason===undefined){reason=pendingReason}pendingReason=null;booked=null;
+  if(reason===undefined){reason=pendingReason}pendingReason=null;booked=null;paid=null;
   last=await post(`/merchant/${mid}/reply`,{text,reason:reason||null});await refresh();return last;
 }
 async function offers(){
@@ -555,12 +571,20 @@ function playCue(text){
    .catch(()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang=lng==="hi"?"hi-IN":"en-IN";u.onend=stop;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}setTimeout(stop,4500)});
 }
 
+// What happened on a day, for the lender's payment record: the owner's replies (labels only, never the
+// raw words), Pakka's actions, and payments through the pay link. Live: a reply shows up straight away.
+function dayEvents(ev,r){
+  const out=ev.filter(e=>e.kind!=="payment").map(e=>e.kind==="reply"?`<span class="chip">${tech?`reply: ${e.intent} → ${e.action}`:`Owner: ${PLAIN[e.intent]||e.intent} → ${PLAIN[e.action]||e.action}`}</span>`
+    :`<span class="chip ${e.deferred?"warn":""}">${tech?e.action+(e.deferred?" (deferred)":""):(PLAIN[e.action]||e.action)+(e.deferred?" (waiting for hours)":"")}</span>`);
+  if(r.paid_direct_paise)out.unshift(`<span class="chip ok">${rs(r.paid_direct_paise)} received via pay link</span>`);
+  return [...new Set(out)].join("")||"–";
+}
 async function loadLedger(){
   const L=await api(`/merchant/${mid}/ledger`);
   $("#ledgerH").textContent=tech?`Lender ledger · ${L.lender} · ${L.shortfall_mode}`:`Lender's payment record · ${L.lender}`;
   const cls={"standard":"","SMA-0":"s0","SMA-1":"s1","SMA-2":"s2","NPA":"npa"};
-  $("#ledgerTbl").innerHTML=`<table><tr>${(tech?["Day","Settlement","EDI","Deducted","Short today","Total due","Credit","DPD","SMA"]:["Day","Sales","Daily payment","Taken","Short today","Total due","Held","Days late","Status"]).map(x=>`<th>${x}</th>`).join("")}</tr>`+
-   L.rows.map((r,i)=>`<tr class="${i===L.rows.length-1?"now":r.shortfall_today_paise?"short":""}"><td>${i+1} · ${dateOf(i+1)}</td><td class="n">${rs(r.settlement_paise)}</td><td class="n">${rs(r.edi_due_paise)}</td><td class="n">${rs(r.deducted_paise)}</td><td class="n">${r.shortfall_today_paise?rs(r.shortfall_today_paise):"–"}</td><td class="n">${r.total_overdue_paise?rs(r.total_overdue_paise):"–"}</td><td class="n">${r.prepayment_credit_paise?rs(r.prepayment_credit_paise):"–"}</td><td class="n">${r.dpd}</td><td><span class="sma ${cls[r.sma_bucket]}">${tech?r.sma_bucket:STATUS[r.sma_bucket]}</span></td></tr>`).join("")+`</table>`;
+  $("#ledgerTbl").innerHTML=`<table><tr>${(tech?["Day","Settlement","EDI","Deducted","Short today","Total due","Credit","DPD","SMA","Events"]:["Day","Sales","Daily payment","Taken","Short today","Total due","Held","Days late","Status","What happened"]).map(x=>`<th>${x}</th>`).join("")}</tr>`+
+   L.rows.map((r,i)=>`<tr class="${i===L.rows.length-1?"now":r.shortfall_today_paise?"short":""}"><td>${i+1} · ${dateOf(i+1)}</td><td class="n">${rs(r.settlement_paise)}</td><td class="n">${rs(r.edi_due_paise)}</td><td class="n">${rs(r.deducted_paise)}</td><td class="n">${r.shortfall_today_paise?rs(r.shortfall_today_paise):"–"}</td><td class="n">${r.total_overdue_paise?rs(r.total_overdue_paise):"–"}</td><td class="n">${r.prepayment_credit_paise?rs(r.prepayment_credit_paise):"–"}</td><td class="n">${r.dpd}</td><td><span class="sma ${cls[r.sma_bucket]}">${tech?r.sma_bucket:STATUS[r.sma_bucket]}</span></td><td class="ev">${dayEvents(L.events[r.day]||[],r)}</td></tr>`).join("")+`</table>`;
   const tb=$("#ledgerTbl");tb.scrollTop=tb.scrollHeight;
 }
 async function loadAudit(){

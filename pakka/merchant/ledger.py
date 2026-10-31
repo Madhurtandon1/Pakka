@@ -17,14 +17,19 @@ def sma_bucket(dpd: int) -> str:
     return "NPA"
 
 
-def simulate(loan: Loan, settlements: list[SettlementDay], config: LenderConfig) -> list[LedgerDay]:
+def simulate(loan: Loan, settlements: list[SettlementDay], config: LenderConfig,
+             payments: dict | None = None) -> list[LedgerDay]:
     """Daily auto-deduction from settlements.
 
     carry_forward_fifo: a short day's partial deduction is applied to the oldest unpaid
     instalment; the remainder is swept from later settlements, oldest first.
     retain_as_prepayment: partial deductions are held as a prepayment credit and only clear
     an instalment once they cover it in full; the instalment shows as overdue until then.
+
+    payments (optional): money the owner paid directly through the pay link, by day. It is applied the
+    same way as that day's deduction, after it. With no payments the ledger is exactly as before.
     """
+    payments = payments or {}
     unpaid: list[list] = []          # [due_date, remaining_paise], oldest first
     credit = 0
     out = []
@@ -51,6 +56,23 @@ def simulate(loan: Loan, settlements: list[SettlementDay], config: LenderConfig)
                 credit -= unpaid[0][1]
                 unpaid.pop(0)
 
+        # Capped at the total shown as due; for a lender that holds part-payments, money beyond what's
+        # needed stays as held credit, as it would in that lender's books.
+        direct = min(payments.get(s.day, 0), sum(r[1] for r in unpaid))
+        if direct:
+            if config.shortfall_mode == "carry_forward_fifo":
+                pay = direct
+                for row in unpaid:
+                    take = min(row[1], pay)
+                    row[1] -= take
+                    pay -= take
+                unpaid = [r for r in unpaid if r[1] > 0]
+            else:
+                credit += direct
+                while unpaid and credit >= unpaid[0][1]:
+                    credit -= unpaid[0][1]
+                    unpaid.pop(0)
+
         oldest = unpaid[0][0] if unpaid else None
         dpd = (s.day - oldest).days + 1 if oldest else 0
         out.append(LedgerDay(
@@ -59,6 +81,6 @@ def simulate(loan: Loan, settlements: list[SettlementDay], config: LenderConfig)
             shortfall_today_paise=max(0, edi - deducted),
             total_overdue_paise=sum(r[1] for r in unpaid),
             prepayment_credit_paise=credit,
-            oldest_unpaid_date=oldest, dpd=dpd, sma_bucket=sma_bucket(dpd),
+            oldest_unpaid_date=oldest, dpd=dpd, sma_bucket=sma_bucket(dpd), paid_direct_paise=direct,
         ))
     return out
