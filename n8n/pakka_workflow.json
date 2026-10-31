@@ -1,0 +1,268 @@
+{
+  "name": "Pakka actions (n8n acts; Pakka's guard decides)",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "pakka-actions",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pakka",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "2",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Verify Pakka's HMAC signature, then decide which branch this action takes.\n// n8n acts; it never chooses an action: Pakka's guard already approved it.\n// Needs NODE_FUNCTION_ALLOW_BUILTIN=crypto when starting n8n (see n8n/README.md).\nconst crypto = require('crypto');\nconst SECRET = 'pakka-demo-secret';          // must equal N8N_WEBHOOK_SECRET in Pakka's .env\nconst PAKKA_URL = 'http://127.0.0.1:8000';   // where Pakka runs, for the people-queue callback\n\nconst out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || {};\n  const headers = item.json.headers || {};\n  const canonical = JSON.stringify(Object.fromEntries(Object.keys(body).sort().map(k => [k, body[k]])));\n  const want = 'sha256=' + crypto.createHmac('sha256', SECRET).update(canonical).digest('hex');\n  if ((headers['x-pakka-signature'] || '') !== want) {\n    throw new Error('Bad signature: this request did not come from Pakka');\n  }\n  const a = body.action;\n  let route = 'log';\n  if (body.requires_human) route = 'people';\n  else if (a === 'schedule_reminder' && body.scheduled_for) route = 'wait';\n  else if (['notify_shortfall', 'send_pay_link', 'schedule_reminder', 'acknowledge_carry_forward'].includes(a)) route = 'send';\n  // Signed item for Pakka's people queue (same secret, same canonical form).\n  const q = { action: a, event_id: body.event_id, merchant_id: body.merchant_id, note: 'needs a person (via n8n)' };\n  const qBody = JSON.stringify(Object.fromEntries(Object.keys(q).sort().map(k => [k, q[k]])));\n  out.push({ json: { ...body, route, queue_url: PAKKA_URL + '/merchant/lender/queue', queue_body: qBody,\n    queue_signature: 'sha256=' + crypto.createHmac('sha256', SECRET).update(qBody).digest('hex') } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, event_id: $json.event_id }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "4",
+      "name": "Switch on action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.route }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "send",
+              "output": 0
+            },
+            {
+              "value2": "wait",
+              "output": 1
+            },
+            {
+              "value2": "people",
+              "output": 2
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      }
+    },
+    {
+      "id": "5",
+      "name": "SMS / WhatsApp (disabled)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        900,
+        80
+      ],
+      "disabled": true,
+      "notes": "Off by default. In production: look up the shop's number by merchant_id and the approved template by template_id. Pakka never sends phone numbers or message text.",
+      "parameters": {
+        "from": "",
+        "to": "",
+        "message": "={{ $json.template_id }}"
+      }
+    },
+    {
+      "id": "6",
+      "name": "Log (simulated send)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7",
+      "name": "Wait until scheduled_for",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        320
+      ],
+      "webhookId": "pakka-wait",
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $json.scheduled_for }}"
+      }
+    },
+    {
+      "id": "8",
+      "name": "Log (reminder due)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        320
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9",
+      "name": "Add to RM queue (HTTP back to Pakka)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        440
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.queue_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Pakka-Signature",
+              "value": "={{ $json.queue_signature }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.queue_body }}",
+        "options": {
+          "timeout": 5000
+        }
+      }
+    },
+    {
+      "id": "10",
+      "name": "Log (other action)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        560
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Switch on action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch on action": {
+      "main": [
+        [
+          {
+            "node": "SMS / WhatsApp (disabled)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log (simulated send)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait until scheduled_for",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add to RM queue (HTTP back to Pakka)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log (other action)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait until scheduled_for": {
+      "main": [
+        [
+          {
+            "node": "Log (reminder due)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

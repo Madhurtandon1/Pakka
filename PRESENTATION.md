@@ -290,6 +290,21 @@ Demo: **Verma Fruit Cart**, days 5, 6 and 7 (also at the end of the guided tour)
 
 ---
 
+### Partners (new, all optional)
+
+> **Sarvam understands and speaks. Cognee remembers. Rules and guards decide. n8n acts. People handle hard cases.** No partner ever chooses an action.
+
+| Partner | What it does | Default (offline) | Turn it on | Fallback |
+|---|---|---|---|---|
+| **Sarvam** speech-to-text (`saaras:v3`) | Turns a recorded voice reply into text (`POST /merchant/{id}/reply/voice`). The transcript is PII-masked and **never sent**: the owner checks it and taps send | Browser speech recognition | `SARVAM_API_KEY` + `pip install sarvamai` | Browser voice → typing |
+| **Sarvam** voice (`bulbul:v3`) | Reads messages aloud; the Soundbox only plays the neutral cue | Browser voice | `SARVAM_API_KEY` | Browser voice |
+| **n8n** | Carries out actions the guard already approved, only when delivered (a message held until 8 am goes at 8 am). Payload: ids, codes and times only, no names, numbers, text or amounts; HMAC-signed; 5 s timeout, one retry; once per `event_id`. Workflow: `n8n/pakka_workflow.json` | **Simulated**: same payload to a local outbox, shown as "Action sent (simulated)"; hard cases go to the people queue | `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` (see `n8n/README.md`) | Local outbox + people queue |
+| **Cognee** memory | Remembers structured facts per shop (short days, reply labels, requests and their status, handoffs, paid-up), only with alerts consent, deleted when consent is withdrawn. Fills an optional, pre-written recall line, e.g. "Last time you said you'd pay the next day, and you did." **Never** passed to the policy or the guard | **Local** timeline in SQLite | `PAKKA_MEMORY=cognee`, `pip install cognee`, `LLM_API_KEY` (per Cognee's docs) | Local timeline |
+
+**Live vs simulated in the default demo:** everything runs offline. Voice and speech-to-text use the browser, n8n is simulated (the lender view shows "Action sent (simulated)"), memory is local. With keys set, Sarvam and n8n go live; Cognee is coded to its current API but not run live here.
+
+---
+
 ## 6. The AI evidence: blind Hindi test
 
 A teammate who had never seen the code wrote **50 replies in Devanagari** (blind set v1). We report what we optimise: **distressed merchants who received an automated payment nudge.**
@@ -317,7 +332,7 @@ A teammate who had never seen the code wrote **50 replies in Devanagari** (blind
 
 | | |
 |---|---|
-| **Tests** | 317 pytest tests (145 loan journey, 172 merchants) plus 28 browser tests of the merchant demo: detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
+| **Tests** | 341 pytest tests (145 loan journey, 196 merchants and partners) plus 30 browser tests of the merchant demo: detector, policy, guards G1–G9, ledger modes, SMA boundaries, consent, cadence, templates, OpenCV checks, PII masking, API flows, the fail-safe classifier (including the 4 blind-v1 replies as regression tests), and all three LLM providers with mocked clients. They pass with and without an LLM configured |
 | **CI** | GitHub Actions runs the tests, `run_eval.py`, `holdout.py` and `merchant_eval.py` on every push |
 | **Docker** | `docker build -t pakka .` runs the evals at build time; `.dockerignore` keeps secrets out of the image |
 | **Secrets** | Keys live only in `.env`, which is git-ignored and never printed. The git history has been scanned clean |
@@ -403,7 +418,8 @@ From news reports of the 26 Oct Q2 FY27 release and earlier releases. **Confirm 
 | Landing page, both demos, both guided tours | ✅ Working; tours checked in a browser |
 | Loan document steps: PAN, Aadhaar OTP, selfie, bank, auto-pay, income PDFs | ✅ Working (25/25 separate scenarios) |
 | "Can't pay today": carry-forward explained, lender routing, callback booking, G10 | ✅ Working (0 violations in a separate pass) |
-| 317 tests + 28 browser tests, CI, Docker | ✅ Passing |
+| Partners: Sarvam speech-to-text, n8n action layer, memory (local / Cognee) | ✅ Built; offline by default with working fallbacks. n8n and Cognee not run live here |
+| 341 tests + 30 browser tests, CI, Docker | ✅ Passing |
 | Second blind test set | 🔜 Next step |
 | Pilot with real data | 🔜 Next step |
 

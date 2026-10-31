@@ -62,13 +62,17 @@ def _make(mid, name, lang, lender_id, values, title, story, soundbox=True) -> Pe
     return Persona(m, loan, LENDERS[lender_id], _days(values, mid), title, story)
 
 
-def personas() -> dict[str, Persona]:
+def personas(demo: bool = False) -> dict[str, Persona]:
+    """The demo shops. demo=True adds a second rainy day (day 12) for Ramesh, used only by the live
+    demo to show Pakka's memory; the evals and unit tests use the original data (demo=False)."""
     rng = random.Random(31)
 
     kirana = _base(rng, 150_000, 300_000)
 
     chai = _base(rng, 120_000, 200_000)
     chai[8], chai[9], chai[10] = 70_000, 20_000, 250_000           # rain on days 9-10, recovery day 11
+    if demo:
+        chai[11] = 30_000                                           # demo only: a second rainy day 12
 
     tailor = _base(rng, 85_000, 95_000)
     tailor[8:14] = [75_000, 70_000, 65_000, 62_000, 61_000, 60_000]  # slow week: early warning day 14

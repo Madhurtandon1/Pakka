@@ -97,11 +97,21 @@ TEMPLATES = {
         "en": "You can view offers from lenders on the offers screen. Compare them before choosing.",
         "hi": "आप ऑफ़र स्क्रीन पर अलग-अलग लोन देने वालों के ऑफ़र देख सकते हैं। चुनने से पहले तुलना करें।",
     },
+    # Optional recall lines filled from memory (context only; never changes the action).
+    "T_RECALL_PENDING_REQUEST": {
+        "en": "Last time you asked for {request}. It's still waiting for {lender}'s decision.",
+        "hi": "पिछली बार आपका अनुरोध था: {request}। इस पर अभी {lender} का फ़ैसला बाकी है।",  # HI: needs native review
+    },
+    "T_RECALL_PAID": {
+        "en": "Last time you said you'd pay the next day, and you did. Thank you.",
+        "hi": "पिछली बार आपने कहा था कि अगले दिन भर देंगे, और आपने भर दिया। धन्यवाद।",  # HI: needs native review
+    },
 }
 
 REQUEST_NAMES = {
     "route_lower_deduction_request": {"en": "a lower daily deduction", "hi": "कम रोज़ाना कटौती"},
     "route_reschedule_request": {"en": "a new repayment date", "hi": "नई भुगतान तारीख"},
+    "route_skip_request": {"en": "more time on one day's payment", "hi": "एक दिन की रकम के लिए समय"},  # HI: needs native review
 }
 
 OPTIONS = {

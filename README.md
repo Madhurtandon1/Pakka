@@ -148,7 +148,7 @@ The handoff rate after three attempts is 0.8 rather than 1.0 because timeouts en
 pytest -q
 ```
 
-317 tests (plus 28 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
+341 tests (plus 30 browser tests: `RUN_E2E=1 pytest tests/e2e`). 145 cover the loan journey: the detector rules, the policy guard, escalation, Hindi output, KFS coverage, PII masking, the OpenCV checks on generated card images, the full API flow, the document steps (format checks, each new blocker and ladder, the guard, "never says rejected", the Aadhaar number never stored in full), the Aadhaar photo reader, and the income-document check. 129 cover Pakka for Merchants: ledger modes and SMA boundaries, rules R1–R4, every guard G1–G9, intents in Hindi, Hinglish and English, the LLM fallbacks, PII masking before the LLM, templates, the API flows, the review fixes (distress without consent, cadence, pay choice, merchant hours, sensitive occasions), and the fail-safe intent rules, including the four blind-v1 replies as regression tests, and all three LLM providers (Anthropic, Gemini, Sarvam) with mocked clients.
 
 ## API
 
@@ -185,6 +185,21 @@ The loan demo walks through the document steps of a Paytm-style application: **d
 | `income_doc` | A statement upload fails any of the checks above | explain → guided re-upload → person |
 
 The new rules live in `pakka/docs_detector.py` and run **after** the unchanged existing rules; the existing face-check rule is reused on the selfie step. The guard also refuses any action that would approve, reject or change a loan, and no template says "rejected". These are format and document checks, not NSDL, UIDAI or bank verification, which the lender runs. New Hindi strings are marked `# HI: needs native review`.
+
+## Partners: Sarvam, n8n, Cognee (all optional)
+
+> **Sarvam understands and speaks. Cognee remembers. Rules and guards decide. n8n acts. People handle hard cases.** No partner ever chooses an action.
+
+| Partner | What it does | Default (offline) | Turn it on | Fallback |
+|---|---|---|---|---|
+| **Sarvam** speech-to-text (`saaras:v3`) | Turns a recorded voice reply into text (`POST /merchant/{id}/reply/voice`). The transcript is PII-masked and **never sent**: the owner checks it and taps send | Browser speech recognition | `SARVAM_API_KEY` + `pip install sarvamai` | Browser voice → typing |
+| **Sarvam** voice (`bulbul:v3`) | Reads messages aloud; the Soundbox only plays the neutral cue | Browser voice | `SARVAM_API_KEY` | Browser voice |
+| **n8n** | Carries out actions the guard already approved, only when delivered (a message held until 8 am goes at 8 am). Payload: ids, codes and times only, no names, numbers, text or amounts; HMAC-signed; 5 s timeout, one retry; once per `event_id`. Workflow: `n8n/pakka_workflow.json` | **Simulated**: same payload to a local outbox, shown as "Action sent (simulated)"; hard cases go to the people queue | `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` (see `n8n/README.md`) | Local outbox + people queue |
+| **Cognee** memory | Remembers structured facts per shop (short days, reply labels, requests and their status, handoffs, paid-up), only with alerts consent, deleted when consent is withdrawn. Fills an optional, pre-written recall line, e.g. "Last time you said you'd pay the next day, and you did." **Never** passed to the policy or the guard | **Local** timeline in SQLite | `PAKKA_MEMORY=cognee`, `pip install cognee`, `LLM_API_KEY` (per Cognee's docs) | Local timeline |
+
+The status strip on `/merchant` shows what is live and what is simulated, and the lender view has **Actions**, **People queue** and **Memory** panels. Memory and n8n run **after** the agent has decided and the guard has checked, so they can't change an action; a test runs the whole merchant eval with memory on and off and checks that every decision is identical (7,000+ decisions).
+
+**What was checked, and how:** Sarvam speech-to-text was written against the installed `sarvamai` 0.1.41 SDK and Sarvam's docs, and tested with a mocked client. The n8n workflow's Code node was run in Node against payloads signed by Pakka (signature, routing, and the signed callback into the people queue). Cognee follows its current documented API (`remember` / `recall` / `forget`), tested with a stand-in module: `pip install cognee` doesn't resolve on Python 3.13 here, so Cognee hasn't been run live.
 
 ## What's next
 

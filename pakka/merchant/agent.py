@@ -17,7 +17,7 @@ from langgraph.graph import END, START, StateGraph
 
 from pakka.pii import mask
 
-from . import intents, policy, rules
+from . import actions, intents, memory, policy, rules
 from .guard import GuardContext, Verdict, effective_window, guard, in_window, next_window_start, soundbox_guard
 from .ledger import simulate
 from .models import ConsentRecord, LedgerDay, MerchantRescue
@@ -338,7 +338,33 @@ class Desk:
         rescue = out.get("rescue") or MerchantRescue(
             merchant_id=merchant_id, loan_id=p.loan.loan_id, reasons=["no rule fired"])
         rescue.latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        self._after(p, rescue, now)
         return rescue
+
+    def _after(self, p: Persona, rescue: MerchantRescue, now: datetime) -> None:
+        """Runs only after the graph has decided and the guard has checked. Memory and partner actions
+        live here, so neither can influence the action that was chosen."""
+        mid = p.merchant.merchant_id
+        delivered = rescue.channel != "none" and rescue.scheduled_for is None
+        # Optional recall line (from facts before today) on proactive cards, including the thank-you.
+        if delivered and rescue.template_id in ("T_SHORTFALL", "T_ARREARS", "T_DIP_RISK", "T_CURED")                 and memory.backend() != "off" and memory.consented(self.store, mid):
+            hit = memory.recall_line(self.store, mid, now.date())
+            if hit:
+                tid, extra = hit
+                vals = {lang: {"lender": p.lender.lender_name,
+                               "request": REQUEST_NAMES.get(extra.get("request_action"), {}).get(lang, "")}
+                        for lang in ("en", "hi")}
+                rescue.recall_template_id = tid
+                rescue.recall_en, rescue.recall_hi = render_both(tid, vals)
+        memory.remember(self.store, mid, now.date(), rescue)
+        # Partner action layer: only a final, delivered action. Deferred ones go when delivered.
+        if delivered and rescue.action != "no_action":
+            when = None
+            if rescue.action == "schedule_reminder":    # the reminder time shown in the message, inside contact hours
+                when = _slot(now, effective_window(p.merchant, self.store.consent(mid)), 2)
+            data = actions.payload(merchant_id=mid, at=now, action=rescue.action, template_id=rescue.template_id,
+                                   language=p.merchant.language, scheduled_for=when, lender_id=p.lender.lender_id)
+            rescue.dispatch_status = actions.dispatch(self.store, mid, data, now)["status"]
 
     def run_day_end(self, merchant_id: str, day: int, now: datetime | None = None) -> MerchantRescue:
         self.store.set_sim_day(merchant_id, day)
@@ -363,6 +389,10 @@ class Desk:
         vals = {lang: {"lender": p.lender.lender_name, "time": f"{slot:%H:%M}", "date": fmt_date(slot, lang)}
                 for lang in ("en", "hi")}
         en, hi = render_both("T_CALLBACK_BOOKED", vals)
+        data = actions.payload(merchant_id=merchant_id, at=now, action="schedule_callback",
+                               template_id="T_CALLBACK_BOOKED", language=p.merchant.language, scheduled_for=slot,
+                               lender_id=p.lender.lender_id)
+        actions.dispatch(self.store, merchant_id, data, now)
         self.store.log({"ts": now.isoformat(), "merchant_id": merchant_id, "loan_id": p.loan.loan_id,
                         "blocker": "reply", "rule_ids": [], "intent": None, "intent_source": "none",
                         "action": "schedule_callback", "template_id": "T_CALLBACK_BOOKED", "channel": "app_card",

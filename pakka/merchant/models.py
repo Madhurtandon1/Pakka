@@ -132,4 +132,8 @@ class MerchantRescue(BaseModel):
     scheduled_for: Optional[datetime] = None
     callback_slots: list[datetime] = []        # offered with human_callback_booking, inside contact hours
     skip_requests_30d: int = 0                 # including this one, for "can't pay today"
+    recall_template_id: Optional[str] = None   # optional line from memory; context only, never the action
+    recall_en: str = ""
+    recall_hi: str = ""
+    dispatch_status: Optional[str] = None      # sent_n8n | simulated | failed_fallback (None: not dispatched)
     latency_ms: float = 0.0

@@ -81,6 +81,13 @@ input[type=range]{accent-color:var(--cyan);width:170px}
 .reply button.mic{background:#fff;color:var(--navy);border:1px solid var(--line)}
 .reply button.mic.on{background:var(--red);color:#fff}
 .micnote{font-size:11px;color:var(--muted);margin-top:-4px}
+.partners{max-width:1500px;margin:0 auto;padding:8px 22px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--fog)}
+.partners b{color:#E6ECF5;font-weight:600}.partners .p{border:1px solid var(--edge);border-radius:999px;padding:3px 10px}
+.partners .p.live{border-color:#2E9E6B;color:#BFF0D8}.partners .why{cursor:help;text-decoration:underline dotted}
+.recall{margin-top:8px;font-size:12.5px;background:#F1F5FF;border-radius:10px;padding:7px 10px;color:#2A3B5C}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+@media(max-width:1000px){.three{grid-template-columns:1fr}}
+.act{font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}.act:last-child{border-bottom:0}
 .reasons{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
 .reasons small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
 .reasons button,.slots button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:999px;padding:5px 10px;font-size:12.5px;margin:0 6px 6px 0;cursor:pointer}
@@ -188,6 +195,7 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
   <a class="pill white" href="/demo">Loan demo</a>
 </div></header>
 
+<div class="partners" id="partners"></div>
 <div class="story" id="story"></div>
 
 <main class="grid">
@@ -236,6 +244,11 @@ tr.now td{background:var(--cyanSoft);font-weight:600}
       <div class="panel" id="reqPanel"><p class="h">Sent to the lender to decide</p><div id="reqs"></div></div>
       <div class="panel" id="auditPanel"><p class="h">Everything Pakka did · this shop</p><div class="tbl" id="auditTbl"></div></div>
     </div>
+    <div class="three">
+      <div class="panel" id="actionsPanel"><p class="h">Actions · what was handed to n8n</p><div id="actionsList"></div></div>
+      <div class="panel" id="queuePanel"><p class="h">People queue · for a relationship manager</p><div id="queueList"></div></div>
+      <div class="panel" id="memoryPanel"><p class="h">Memory · what Pakka remembers about this shop</p><div id="memoryList"></div></div>
+    </div>
     <div class="panel" id="skipPanel"><p class="h">"Can't pay today" · this shop, last 30 days</p><div id="skips"></div></div>
   </section>
 </main>
@@ -273,7 +286,7 @@ const GUARD={
 };
 const CH={app_card:"App",soundbox_cue:"Soundbox + app",none:"Not sent"};
 const STATUS={standard:"On time","SMA-0":"1–30 days late","SMA-1":"31–60 days late","SMA-2":"61–90 days late",NPA:"Over 90 days late"};
-const REQ={route_skip_request:"Can't pay today",human_callback_booking:"Call with a person (can't pay today)",human_handoff:"Talk to a person",route_lower_deduction_request:"Smaller daily payment",route_reschedule_request:"New payment date"};
+const REQ={route_skip_request:"Can't pay today",route_lower_deduction_request:"Smaller daily payment",route_reschedule_request:"New payment date",human_callback_booking:"Call with a person (can't pay today)",human_handoff:"Talk to a person"};
 const REQSTATUS={pending_lender_decision:"Waiting for the lender's decision",pending_lender_contact:"The lender will contact them"};
 const plain=k=>tech?k:(PLAIN[k]||k);
 const guardText=b=>tech?b:(GUARD[b.split(/[ :]/)[0]]||b);
@@ -378,7 +391,7 @@ async function select(id){cvOut="";booked=null;
 async function refresh(){
   const c=await api(`/merchant/${mid}/consent`);
   renderPhone(c);
-  await Promise.all([loadLedger(),loadAudit(),loadReqs(),loadDash(),loadSkips()]);
+  await Promise.all([loadLedger(),loadAudit(),loadReqs(),loadDash(),loadSkips(),loadPartners(),loadPartnerPanels()]);
 }
 
 // Without permission Pakka never contacts the owner, but the owner can always write in:
@@ -433,6 +446,8 @@ function renderCard(){
   el.innerHTML=`<div class="eb"><span>Pakka ✦ <button class="listen" id="listenCard">${t.listen}</button></span><span>${esc(dateOf(+$("#day").value))}</span></div><div class="msg">${esc(msg).replace(/upi:\/\/\S+/g,u=>`<a class="paylink" href="${u}">${lang==="hi"?"UPI से भरें ↗":"Pay via UPI ↗"}</a>`)}</div>
     ${r.options.length?`<div class="opts">${r.options.map(o=>`<button data-opt="${o}">${t.opt[o]}</button>`).join("")}</div>`:""}
     <div class="chips">${chips.map(([k,c])=>`<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>`;
+  const rc=lang==="hi"?r.recall_hi:r.recall_en;
+  if(rc){const d=document.createElement("div");d.className="recall";d.innerHTML=`🧠 ${esc(rc)}${tech?` <span class="muted">(${esc(r.recall_template_id)}, memory: ${esc(PARTNERS?.memory?.backend||"local")})</span>`:""}`;el.querySelector(".msg").after(d)}
   el.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>b.dataset.opt==="skip_today"?showReasons(el):reply(T[lang].say[b.dataset.opt]));
   if(r.action==="human_callback_booking"&&r.callback_slots?.length&&!booked){
     const d=document.createElement("div");d.className="slots";
@@ -458,6 +473,27 @@ function fmtSlot(x){const d=new Date(x);return d.toLocaleString(lang==="hi"?"hi-
 async function book(slot){
   booked=await post(`/merchant/${mid}/callbacks`,{slot});
   toast(lang==="hi"?booked.message_hi:booked.message_en);await refresh();
+}
+// Partners: what is live and what is simulated. None of them chooses an action.
+let PARTNERS=null;
+const KIND={shortfall:"Short day",paid_up:"Paid up",reply:"Replied",request:"Asked the lender",handoff:"Passed to a person"};
+const ACT_STATUS={sent_n8n:"Sent via n8n",simulated:"Action sent (simulated)",failed_fallback:"n8n failed → kept locally"};
+async function loadPartners(){
+  PARTNERS=await api("/merchant/partners");const P=PARTNERS,el=$("#partners");
+  const chip=(label,val,live)=>`<span class="p ${live?"live":""}">${label}: <b>${val}</b></span>`;
+  el.innerHTML=`<span class="why" title="${esc(P.principle)}">Who does what?</span>`+
+    chip("Sarvam voice",P.sarvam.voice,P.sarvam.voice==="live")+chip("Sarvam speech-to-text",P.sarvam.speech_to_text,P.sarvam.speech_to_text==="live")+
+    chip("n8n",P.n8n.mode,P.n8n.mode==="live")+chip("Memory",P.memory.backend,P.memory.backend==="Cognee")+
+    (P.n8n.last?.status==="failed_fallback"?`<span class="p">last n8n call failed: kept locally</span>`:"")+
+    (P.memory.last?.error?`<span class="p">${esc(P.memory.last.error)}</span>`:"");
+}
+async function loadPartnerPanels(){
+  const [acts,queue,mem]=await Promise.all([api(`/merchant/actions?merchant_id=${mid}&limit=8`),api("/merchant/lender/queue"),api(`/merchant/${mid}/memory`)]);
+  $("#actionsList").innerHTML=acts.length?acts.map(a=>{const p=JSON.parse(a.payload);return`<div class="act"><b>${esc(plain(a.action))}</b> · <span class="chip ${a.status==="sent_n8n"?"ok":"warn"}">${esc(ACT_STATUS[a.status]||a.status)}</span>${p.requires_human?' · <span class="chip warn">needs a person</span>':""}<br><span class="muted">${esc(a.at.slice(5,16).replace("T"," "))}${tech?` · ${esc(a.event_id)} · ${esc(p.merchant_id)} · ${esc(p.template_id||"")}`:""}</span></div>`}).join(""):`<p class="muted">Nothing yet. Every action Pakka's guard approves is handed over here (no names, numbers or amounts).</p>`;
+  $("#queueList").innerHTML=queue.length?queue.slice(0,8).map(q=>`<div class="act"><b>${esc(plain(q.action))}</b> · <span class="chip warn">${q.source==="n8n"?"From n8n":"Simulated"}</span><br><span class="muted">${esc(q.merchant_ref)} · ${esc(q.note)}</span></div>`).join(""):`<p class="muted">No one waiting. Hard cases (a hard time, a dispute, a call) land here for a person.</p>`;
+  $("#memoryList").innerHTML=`<div class="muted" style="margin-bottom:6px">Backend: <b>${esc(mem.backend==="cognee"?"Cognee":"local")}</b>${mem.note?` · ${esc(mem.note)}`:""}. Facts only: no names, numbers or amounts.</div>`+
+    (mem.items.length?mem.items.slice(-8).map(i=>`<div class="act">${esc(dateOf(+i.day.slice(8,10)))} · ${esc(KIND[i.kind]||i.kind)}${i.intent?`: ${esc(PLAIN[i.intent]||i.intent)}`:""}${i.type?`: ${esc(REQ[i.type]||i.type)}, waiting for the lender`:""}</div>`).join(""):`<p class="muted">Nothing remembered. Memory needs alerts permission, and is deleted when it's withdrawn.</p>`)+
+    (mem.answer?`<div class="recall">Cognee: ${esc(mem.answer.join(" "))}</div>`:"");
 }
 async function loadSkips(){
   const s=await api(`/merchant/${mid}/skips`);
@@ -559,15 +595,31 @@ $("#reset").onclick=async()=>{await post("/merchant/reset");last=null;cvOut="";d
 document.querySelectorAll("#lang button").forEach(b=>b.onclick=async()=>{lang=b.dataset.lang;{const p=P[mid];if(p)$("#phLender").textContent=lang==="hi"?`बिज़नेस ऐप (डेमो) · लोन: ${p.lender}`:`Business app (demo) · loan from ${p.lender}`}document.querySelectorAll("#lang button").forEach(x=>x.classList.toggle("on",x===b));await refresh()});
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 // Voice: the transcript goes into the reply box for the owner to check, edit and send. Never auto-sent.
-$("#mic").onclick=()=>{
-  const t=T[lang];
+let recorder=null;
+async function sarvamVoice(t){
+  // Record a short reply and ask Pakka's server for a Sarvam transcript. Returns false to fall back.
+  if(PARTNERS?.sarvam?.speech_to_text!=="live"||!window.MediaRecorder||!navigator.mediaDevices?.getUserMedia)return false;
+  if(recorder){recorder.stop();return true}                       // second tap stops recording
+  let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast(t.micDenied);return true}
+  const chunks=[];recorder=new MediaRecorder(stream);$("#mic").classList.add("on");
+  recorder.ondataavailable=e=>chunks.push(e.data);
+  recorder.onstop=async()=>{stream.getTracks().forEach(x=>x.stop());$("#mic").classList.remove("on");recorder=null;
+    const fd=new FormData();fd.append("file",new Blob(chunks,{type:"audio/webm"}),"reply.webm");
+    try{const r=await api(`/merchant/${mid}/reply/voice?lang=${lang}`,{method:"POST",body:fd});
+      const box=$("#replyText");box.value=r.transcript;box.focus();toast(`${t.micCheck} (Voice by Sarvam)`)}
+    catch(e){toast("Sarvam couldn't hear that, so your browser will listen instead.");browserVoice(t)}};
+  recorder.start();setTimeout(()=>recorder&&recorder.state==="recording"&&recorder.stop(),8000);
+  toast(lang==="hi"?"बोलिए… रोकने के लिए 🎤 फिर दबाएँ":"Speak now… tap 🎤 again to stop");return true;
+}
+function browserVoice(t){
   if(!SR){toast(t.micNo);return}
   const rec=new SR();rec.lang=lang==="hi"?"hi-IN":"en-IN";rec.interimResults=false;
   $("#mic").classList.add("on");rec.onend=()=>$("#mic").classList.remove("on");
   rec.onerror=e=>{$("#mic").classList.remove("on");toast(e.error==="not-allowed"||e.error==="service-not-allowed"?t.micDenied:t.micErr)};
-  rec.onresult=e=>{const box=$("#replyText");box.value=e.results[0][0].transcript;box.focus();toast(t.micCheck)};
+  rec.onresult=e=>{const box=$("#replyText");box.value=e.results[0][0].transcript;box.focus();toast(`${t.micCheck} (Voice by your browser)`)};
   try{rec.start()}catch(e){$("#mic").classList.remove("on");toast(t.micErr)}
-};
+}
+$("#mic").onclick=async()=>{const t=T[lang];if(await sarvamVoice(t))return;browserVoice(t)};
 
 // Guided tour: /merchant?tour=1 runs the demo script against the live API with captions.
 async function tour(){
@@ -594,6 +646,9 @@ async function tour(){
     ["Next day, the same again. Pakka confirms it, without asking why again, and no new loan offers for 90 days.","#card",async()=>{setDay(6);await runDay();await reply(T[lang].say.skip_today,null)}],
     ["A third day in a row. Pakka doesn't keep pushing: it checks in, and offers a call with a person at a time inside the shop's hours.","#card",async()=>{setDay(7);await runDay();await reply(T[lang].say.skip_today,null)}],
     ["The owner picks a time. The callback appears in the lender's view, with a reminder inside contact hours.","#skipPanel",async()=>{const b=document.querySelector("#card [data-slot]");if(b)await book(b.dataset.slot)}],
+    ["Back to the chai stall: it rains again on day 12. Pakka remembers he paid the day after last time, and says so. Memory only adds this line; it never changes what Pakka does.","#card",async()=>{await go("chai_seasonal",12);await allow();await runDay()}],
+    ["He answers by voice. Sarvam (or the browser) turns speech into text, and it waits in the box until he taps send. In this tour the voice is simulated.","#replyText",async()=>{$("#replyText").value="Kal de dunga";toast(`${T[lang].micCheck} (voice simulated for the tour)`);await sleep(1500);await reply()}],
+    ["Every action the guard approves is handed to n8n to carry out (here: simulated, with no names, numbers or amounts). Hard cases land in the people queue. Sarvam understands and speaks, memory remembers, rules and guards decide, n8n acts, people handle hard cases.","#actionsPanel",null],
   ];
   await sleep(800);
   for(let i=0;i<S.length;i++){

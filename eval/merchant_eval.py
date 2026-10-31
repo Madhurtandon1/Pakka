@@ -27,6 +27,7 @@ from pakka.merchant.store import MerchantStore  # noqa: E402
 from pakka.merchant.synth import DAYS, personas, random_merchants  # noqa: E402
 
 OUT = Path(__file__).with_name("merchant_results.json")
+TRACE: list = []      # every decision (merchant, time, action, channel, template, guard blocks), for comparisons
 
 # Labelled replies (Hindi, romanised Hindi, English, Hinglish). Used both to drive the simulation and
 # to measure the offline keyword classifier.
@@ -59,7 +60,8 @@ SKIP_REPLIES = [
 ]
 
 
-def main(seed: int = 11) -> int:
+def main(seed: int = 11, write: bool = True) -> int:
+    TRACE.clear()
     rng = random.Random(seed)
     book = {**{k: v for k, v in personas().items() if k in ORIGINAL_PERSONAS}, **random_merchants(200)}
     desk = Desk(MerchantStore(":memory:"), book)
@@ -84,6 +86,7 @@ def main(seed: int = 11) -> int:
 
     def check(mid, r, now, proactive):
         p = book[mid]
+        TRACE.append((mid, now.isoformat(), r.action, r.channel, r.template_id, tuple(r.guard_blocks)))
         latencies.append(r.latency_ms)
         rescues.append(r)
         actions[r.action] += 1
@@ -176,7 +179,8 @@ def main(seed: int = 11) -> int:
     }
     skip = skip_pass()
     res["skip_requests"] = skip
-    OUT.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
+    if write:
+        OUT.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(f"merchants: {res['merchants']} x {DAYS} days, rescues: {res['rescues']}")
     print(f"guard violations: {res['guard_violations']}")
@@ -224,6 +228,7 @@ def skip_pass(seed: int = 23) -> dict:
             text, want = rng.choice(SKIP_REPLIES) if mid != "fruit_cart" else SKIP_REPLIES[0]
             now = desk.at(mid, day, "18:45")
             r = desk.run_reply(mid, text, now, day)
+            TRACE.append((mid, now.isoformat(), r.action, r.channel, r.template_id, tuple(r.guard_blocks)))
             sent += 1
             actions[r.action] += 1
             if r.action in DECISION_ACTIONS:

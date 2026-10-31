@@ -3,24 +3,24 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from pakka import sarvam
-from pakka.merchant import intents, policy
+from pakka.merchant import actions, intents, memory, policy
 from pakka.merchant.agent import Desk
 from pakka.merchant.guard import effective_window, in_window
 from pakka.merchant.models import ConsentIn
 from pakka.merchant.rules import THRESHOLDS
-from pakka.merchant.synth import DAYS
+from pakka.merchant.synth import DAYS, personas
 from pakka.merchant.templates import SOUNDBOX_CUE
 
 STATIC = Path(__file__).with_name("static")
 RESULTS = Path(__file__).resolve().parents[1] / "eval" / "merchant_results.json"
 
 router = APIRouter(prefix="/merchant")
-desk = Desk()
+desk = Desk(book=personas(demo=True))     # demo data: adds Ramesh's second rainy day (memory demo)
 
 
 class ReplyIn(BaseModel):
@@ -109,7 +109,9 @@ def grant_consent(mid: str, body: ConsentIn, now: str | None = None):
 def withdraw_consent(mid: str, now: str | None = None):
     _persona(mid)
     at = desk.at(mid, desk.store.sim_day(mid), _hhmm(now, "09:00"))
-    return {"withdrawn": desk.store.withdraw_consent(mid, at)}
+    withdrawn = desk.store.withdraw_consent(mid, at)
+    memory.forget(desk.store, mid)          # withdrawing consent deletes what Pakka remembers
+    return {"withdrawn": withdrawn, "memory_deleted": True}
 
 
 @router.post("/{mid}/simulate")
@@ -124,6 +126,80 @@ def reply(mid: str, body: ReplyIn):
     _persona(mid)
     day = desk.store.sim_day(mid)
     return desk.run_reply(mid, body.text, desk.at(mid, day, _hhmm(body.now, "18:05")), day, body.reason)
+
+
+PRINCIPLE = ("Sarvam understands and speaks. Cognee remembers. Rules and guards decide. n8n acts. "
+             "People handle hard cases.")
+
+
+@router.post("/{mid}/reply/voice")
+async def reply_voice(mid: str, file: UploadFile = File(...), lang: str = Query("hi")):
+    """Recorded reply -> Sarvam speech-to-text -> masked transcript. NEVER sent: the owner checks it,
+    edits it, and sends it through /reply like any typed reply."""
+    from pakka.pii import mask
+    _persona(mid)
+    try:
+        audio = await file.read(5 * 1024 * 1024 + 1)
+    finally:
+        await file.close()
+    if len(audio) > 5 * 1024 * 1024:
+        raise HTTPException(413, "recording too long")
+    if not sarvam.stt_available():
+        sarvam.STT_LAST.update(status="unavailable", detail="no SARVAM_API_KEY or sarvamai SDK")
+        raise HTTPException(503, "Sarvam speech-to-text isn't set up; the page uses the browser's voice")
+    try:
+        text = sarvam.stt(audio, file.filename or "reply.webm", file.content_type or "audio/webm", lang)
+    except Exception as exc:
+        sarvam.STT_LAST.update(status="failed", detail=type(exc).__name__)
+        raise HTTPException(502, "Sarvam speech-to-text failed; the page uses the browser's voice") from exc
+    sarvam.STT_LAST.update(status="ok", detail=None)
+    return {"transcript": mask(text), "source": "sarvam", "language": lang, "sent": False}
+
+
+@router.get("/partners")
+def partners():
+    """What is live and what is simulated, for the status strip. Partners never choose an action."""
+    stt = sarvam.stt_available()
+    return {
+        "principle": PRINCIPLE,
+        "sarvam": {"voice": "live" if sarvam.enabled() else "browser fallback",
+                   "speech_to_text": "live" if stt else "browser fallback", "last": sarvam.STT_LAST},
+        "n8n": {"mode": "live" if actions.webhook_url() else "simulated", "last": actions.LAST},
+        "memory": {"backend": {"cognee": "Cognee", "off": "off"}.get(memory.backend(), "local"),
+                   "last": memory.STATE},
+    }
+
+
+@router.get("/actions")
+def dispatched_actions(merchant_id: str | None = None, limit: int = 30):
+    return desk.store.outbox(merchant_id, limit)
+
+
+@router.get("/lender/queue")
+def people_queue():
+    return desk.store.queue()
+
+
+@router.post("/lender/queue")
+async def queue_push(request: Request, x_pakka_signature: str | None = Header(None)):
+    """n8n pushes items for a relationship manager. Signed with the same HMAC as outgoing events."""
+    body = await request.body()
+    import hmac as _hmac
+    if not x_pakka_signature or not _hmac.compare_digest(x_pakka_signature, actions.sign(body)):
+        raise HTTPException(401, "bad or missing signature")
+    try:
+        item = __import__("json").loads(body)
+        desk.store.queue_add(str(item["event_id"]), str(item["merchant_id"]), str(item["action"]),
+                             str(item.get("note", "needs a person"))[:200], "n8n", datetime.now())
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(422, "need event_id, merchant_id and action") from exc
+    return {"ok": True}
+
+
+@router.get("/{mid}/memory")
+def merchant_memory(mid: str):
+    _persona(mid)
+    return memory.recall(desk.store, mid)
 
 
 @router.post("/{mid}/callbacks")

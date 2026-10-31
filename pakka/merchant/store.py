@@ -36,6 +36,15 @@ class _Serialised:
         return getattr(self._conn, name)
 
 SCHEMA = """
+create table if not exists merchant_outbox (
+    event_id text primary key, merchant_id text, action text, payload text, status text, detail text, at text
+);
+create table if not exists merchant_queue (
+    id integer primary key autoincrement, event_id text, merchant_ref text, action text, note text, source text, at text
+);
+create table if not exists merchant_memory (
+    id integer primary key autoincrement, merchant_id text, day text, kind text, data text
+);
 create table if not exists merchant_flags (
     id integer primary key autoincrement, merchant_id text, kind text, at text, note text
 );
@@ -67,7 +76,7 @@ create table if not exists merchant_sim (merchant_id text primary key, day integ
 """
 
 TABLES = ["merchant_consent", "merchant_episodes", "merchant_requests", "merchant_audit", "merchant_sim",
-          "merchant_flags", "merchant_appointments"]
+          "merchant_flags", "merchant_appointments", "merchant_outbox", "merchant_queue", "merchant_memory"]
 
 
 class MerchantStore:
@@ -210,6 +219,42 @@ class MerchantStore:
                     (aid, merchant_id, loan_id, lender_id, slot.isoformat(), reminder_at.isoformat(),
                      "booked", reason, at.isoformat()))
         return self.appointments(merchant_id=merchant_id)[0]
+
+    # Partner actions (n8n or simulated): one row per event_id, so a retried event is never sent twice.
+    def outbox_get(self, event_id: str) -> Optional[dict]:
+        r = self.db.execute("select * from merchant_outbox where event_id = ?", (event_id,)).fetchone()
+        return dict(r) if r else None
+
+    def outbox_add(self, event_id: str, merchant_id: str, action: str, payload: str, status: str,
+                   detail: str, at: datetime) -> None:
+        self._write("insert or ignore into merchant_outbox values (?, ?, ?, ?, ?, ?, ?)",
+                    (event_id, merchant_id, action, payload, status, detail, at.isoformat()))
+
+    def outbox(self, merchant_id: str | None = None, limit: int = 50) -> list[dict]:
+        q, args = "select * from merchant_outbox", ()
+        if merchant_id:
+            q, args = q + " where merchant_id = ?", (merchant_id,)
+        return [dict(r) for r in self.db.execute(q + " order by at desc limit ?", args + (limit,))]
+
+    # People queue: items n8n (or the simulated dispatcher) pushes back for a relationship manager.
+    def queue_add(self, event_id: str, merchant_ref: str, action: str, note: str, source: str, at: datetime) -> None:
+        self._write("insert into merchant_queue (event_id, merchant_ref, action, note, source, at) "
+                    "values (?, ?, ?, ?, ?, ?)", (event_id, merchant_ref, action, note, source, at.isoformat()))
+
+    def queue(self, limit: int = 50) -> list[dict]:
+        return [dict(r) for r in self.db.execute("select * from merchant_queue order by id desc limit ?", (limit,))]
+
+    # Memory timeline (local backend): structured facts only, no free text.
+    def memory_add(self, merchant_id: str, day: date, kind: str, data: str) -> None:
+        self._write("insert into merchant_memory (merchant_id, day, kind, data) values (?, ?, ?, ?)",
+                    (merchant_id, day.isoformat(), kind, data))
+
+    def memory(self, merchant_id: str) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select day, kind, data from merchant_memory where merchant_id = ? order by id", (merchant_id,))]
+
+    def memory_forget(self, merchant_id: str) -> None:
+        self._write("delete from merchant_memory where merchant_id = ?", (merchant_id,))
 
     def appointments(self, lender_id: str | None = None, merchant_id: str | None = None) -> list[dict]:
         q, args = "select * from merchant_appointments where 1 = 1", ()

@@ -595,3 +595,72 @@ def test_21_fruit_cart_cant_pay_today(ui):
         ui.p.click("#offers")
     ui.see("#toast", "No loan offers")
     ui.shot("callback_booked_lender_view")
+
+
+def test_22a_partners_offline(ui):
+    """22. Partners offline: status strip, simulated actions, people queue, memory and recall lines"""
+    ui.open("chai_seasonal")
+    ui.see("#partners", "n8n: simulated")
+    ui.see("#partners", "Memory: local")
+    ui.see("#partners", "Sarvam speech-to-text: browser fallback")
+    assert "Rules and guards decide" in ui.p.get_attribute("#partners .why", "title")
+    ui.allow()
+    ui.run(10)
+    ui.see("#actionsList", "Action sent (simulated)")
+    ui.tap("pay_later")
+    ui.run(11)
+    ui.see("#memoryList", "Replied: will pay later")
+    ui.see("#memoryList", "Paid up")
+    ui.run(12)                                     # demo data: a second rainy day
+    ui.see("#card .recall", "you did. Thank you")
+    ui.shot("recall_ramesh")
+    ui.say("Bimar hoon, dukaan band hai")
+    ui.see("#queueList", "Passed to a person")
+    ui.see("#queueList", "Simulated")
+    ui.shot("actions_queue_memory")
+    ui.p.click("#withdraw")
+    ui.see("#memoryList", "Nothing remembered")
+    ui.shot("memory_deleted_on_withdraw")
+    # City Mobile: the pending request is remembered on the thank-you card
+    ui.reset()
+    ui.pick("kirana_steady")
+    ui.pick("mobile_dispute")
+    ui.allow()
+    ui.run(8)
+    ui.tap("reschedule")
+    ui.run(9)
+    ui.see("#card .recall", "a new repayment date")
+    ui.see("#card .recall", "Demo Bank B")
+    ui.shot("recall_city_mobile")
+
+
+def test_22b_sarvam_voice_path(ui):
+    """22. Sarvam speech-to-text path: recorded audio → transcript in the box, not sent until Send"""
+    ui.p.add_init_script("""
+      navigator.mediaDevices.getUserMedia=async()=>({getTracks:()=>[{stop(){}}]});
+      window.MediaRecorder=class{constructor(){this.state="inactive"}start(){this.state="recording";
+        setTimeout(()=>this.stop(),80)}stop(){if(this.state!=="recording")return;this.state="inactive";
+        this.ondataavailable&&this.ondataavailable({data:new Blob(["x"])});this.onstop&&this.onstop()}};""")
+    def partners(route):
+        resp = route.fetch()
+        data = resp.json()
+        data["sarvam"]["speech_to_text"] = "live"
+        route.fulfill(response=resp, json=data)
+    ui.p.route("**/merchant/partners", partners)
+    ui.p.route("**/reply/voice*", lambda route: route.fulfill(
+        json={"transcript": "aaj nahi de paunga, kal kaat lena", "source": "sarvam", "sent": False}))
+    ui.open("fruit_cart")
+    ui.allow()
+    ui.run(5)
+    before = len(ui.audit("fruit_cart"))
+    with ui.p.expect_request(lambda r: "/reply/voice" in r.url):
+        ui.p.click("#mic")
+    expect(ui.p.locator("#replyText")).to_have_value("aaj nahi de paunga, kal kaat lena")
+    ui.see("#toast", "Voice by Sarvam")
+    ui.p.wait_for_timeout(500)
+    assert len(ui.audit("fruit_cart")) == before, "a voice transcript was sent without tapping Send"
+    ui.shot("sarvam_transcript")
+    with ui.p.expect_response(lambda r: r.url.endswith("/reply")):
+        ui.p.click("#send")
+    ui.see("#card", "as your lender's plan allows")
+    ui.p.unroute_all(behavior="ignoreErrors")    # don't leave the fake routes open at browser close
